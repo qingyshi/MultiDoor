@@ -101,9 +101,9 @@ class BaseDataset(Dataset):
     
 
     def process_pairs(self, ref_image, ref_mask, tar_image, tar_mask, max_ratio = 0.8):
-        assert mask_score(ref_mask) > 0.90
-        assert self.check_mask_area(ref_mask) == True
-        assert self.check_mask_area(tar_mask)  == True
+        assert mask_score(np.max(ref_mask, axis=0)) > 0.90
+        assert self.check_mask_area(np.max(ref_mask, axis=0)) == True
+        assert self.check_mask_area(np.max(tar_mask, axis=0)) == True
 
         '''
         inputs:
@@ -140,8 +140,8 @@ class BaseDataset(Dataset):
         multi_subject_ref_mask = []
         
         for single_mask in ref_mask:
-            ref_box_yyxx = get_bbox_from_mask(ref_mask)
-            assert self.check_region_size(ref_mask, ref_box_yyxx, ratio = 0.10, mode = 'min') == True
+            ref_box_yyxx = get_bbox_from_mask(single_mask)
+            assert self.check_region_size(single_mask, ref_box_yyxx, ratio = 0.10, mode = 'min') == True
         
             # Filtering background for the reference image
             ref_mask_3 = np.stack([single_mask, single_mask, single_mask], -1)
@@ -149,11 +149,11 @@ class BaseDataset(Dataset):
 
             y1, y2, x1, x2 = ref_box_yyxx
             masked_ref_image = masked_ref_image[y1: y2, x1: x2, :]
-            ref_mask = ref_mask[y1: y2, x1: x2]
+            single_mask = single_mask[y1: y2, x1: x2]
 
             ratio = np.random.randint(11, 15) / 10 
-            masked_ref_image, ref_mask = expand_image_mask(masked_ref_image, ref_mask, ratio=ratio)
-            ref_mask_3 = np.stack([ref_mask, ref_mask, ref_mask],-1)
+            masked_ref_image, single_mask = expand_image_mask(masked_ref_image, single_mask, ratio=ratio)
+            ref_mask_3 = np.stack([single_mask, single_mask, single_mask], -1)
 
             # Padding reference image to square and resize to 224
             masked_ref_image = pad_to_square(masked_ref_image, pad_value = 255, random = False)
@@ -161,13 +161,13 @@ class BaseDataset(Dataset):
 
             ref_mask_3 = pad_to_square(ref_mask_3 * 255, pad_value = 0, random = False)
             ref_mask_3 = cv2.resize(ref_mask_3.astype(np.uint8), (224, 224)).astype(np.uint8)
-            ref_mask = ref_mask_3[:, :, 0]
+            single_mask = ref_mask_3[:, :, 0]
 
             # Augmenting reference image
             # masked_ref_image_aug = self.aug_data(masked_ref_image) 
             
             # Getting for high-freqency map
-            masked_ref_image_compose, ref_mask_compose =  self.aug_data_mask(masked_ref_image, ref_mask) 
+            masked_ref_image_compose, ref_mask_compose =  self.aug_data_mask(masked_ref_image, single_mask) 
             masked_ref_image_aug = masked_ref_image_compose.copy()
             multi_subject_ref_image.append(masked_ref_image_aug)
             multi_subject_ref_mask.append(ref_mask_compose)
@@ -197,14 +197,14 @@ class BaseDataset(Dataset):
             multi_subject_bbox_crop.append(tar_box_yyxx_crop)
         
         y1, x1 = min([[bbox[0], bbox[2]] for bbox in multi_subject_bbox_crop])
-        y2, x2 = max([[bbox[0], bbox[2]] for bbox in multi_subject_bbox_crop])
+        y2, x2 = max([[bbox[1], bbox[3]] for bbox in multi_subject_bbox_crop])
         tar_box_yyxx_crop = (y1, y2, x1, x2)
         cropped_target_image = tar_image[y1: y2, x1: x2, :]
         tar_mask = np.max(tar_mask, axis=0)
         cropped_tar_mask = tar_mask[y1: y2, x1: x2]
         
         y1, x1 = min([[bbox[0], bbox[2]] for bbox in multi_subject_bbox])
-        y2, x2 = max([[bbox[0], bbox[2]] for bbox in multi_subject_bbox])
+        y2, x2 = max([[bbox[1], bbox[3]] for bbox in multi_subject_bbox])
         tar_box_yyxx = (y1, y2, x1, x2)
         tar_box_yyxx = box_in_box(tar_box_yyxx, tar_box_yyxx_crop)
         y1, y2, x1, x2 = tar_box_yyxx
@@ -233,7 +233,7 @@ class BaseDataset(Dataset):
 
         cropped_target_image = cv2.resize(cropped_target_image.astype(np.uint8), (512, 512)).astype(np.float32)
         collage = cv2.resize(collage.astype(np.uint8), (512, 512)).astype(np.float32)
-        collage_mask  = cv2.resize(collage_mask.astype(np.uint8), (512, 512),  interpolation = cv2.INTER_NEAREST).astype(np.float32)
+        collage_mask = cv2.resize(collage_mask.astype(np.uint8), (512, 512), interpolation = cv2.INTER_NEAREST).astype(np.float32)
         collage_mask[collage_mask == 2] = -1
         
         # Prepairing dataloader items

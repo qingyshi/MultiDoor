@@ -46,8 +46,12 @@ class YoutubeVISDataset(BaseDataset):
 
     def get_sample(self, idx):
         video_id = list(self.records.keys())[idx]
-        objects_id = np.random.choice( list(self.records[video_id]["objects"].keys()) )
-        frames = self.records[video_id]["objects"][objects_id]["frames"]
+        obj_list = list(self.records[video_id]["objects"].keys())
+        if len(obj_list) <= 1:
+            raise Exception
+        objects_id = np.random.choice(obj_list, 2, replace=False)
+        frames = [self.records[video_id]["objects"][single_id]["frames"] for single_id in objects_id]
+        frames = np.intersect1d(*frames)
 
         # Sampling frames
         min_interval = len(frames)  // 10
@@ -70,13 +74,13 @@ class YoutubeVISDataset(BaseDataset):
         tar_image = cv2.imread(tar_image_path)
         tar_image = cv2.cvtColor(tar_image, cv2.COLOR_BGR2RGB)
 
-        ref_mask = Image.open(ref_mask_path ).convert('P')
+        ref_mask = Image.open(ref_mask_path).convert('P')
         ref_mask= np.array(ref_mask)
-        ref_mask = ref_mask == int(objects_id)
+        ref_mask = np.stack([ref_mask == int(single_id) for single_id in objects_id], 0)
 
-        tar_mask = Image.open(tar_mask_path ).convert('P')
+        tar_mask = Image.open(tar_mask_path).convert('P')
         tar_mask= np.array(tar_mask)
-        tar_mask = tar_mask == int(objects_id)
+        tar_mask = np.stack([tar_mask == int(single_id) for single_id in objects_id], 0)
 
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()
