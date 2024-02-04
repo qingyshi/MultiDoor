@@ -141,3 +141,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# custom
+checkpoints/
+hf_down.py
+cache_dir/
+.vscode/

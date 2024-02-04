@@ -41,7 +41,7 @@ class MVImageNetDataset(BaseDataset):
         return mask
         
     def get_sample(self, idx):
-        object_dir = self.data[idx].replace('MVDir/', self.image_dir) 
+        object_dir = self.data[idx].replace('./', self.image_dir) 
         frames = os.listdir(object_dir)
         frames = [ i for i in frames if '.png' in i]
 
