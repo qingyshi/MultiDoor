@@ -15,7 +15,7 @@ Train:
 
   UVO:
     train:
-      image_dir: /data00/UVO/uvo_videos_sparse_frames
+      image_dir: /data00/UVO/uvo_frames_sparse
       video_json: /data00/UVO/VideoSparseSet/UVO_sparse_train_video_with_interpolation.json
       image_json: /data00/UVO/VideoSparseSet/UVO_sparse_train_video_with_interpolation_reorg.json
     val:

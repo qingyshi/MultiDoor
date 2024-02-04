@@ -17,6 +17,7 @@ from cldm.model import create_model, load_state_dict
 from torch.utils.data import ConcatDataset
 from cldm.hack import disable_verbosity, enable_sliced_attention
 from omegaconf import OmegaConf
+from pytorch_lightning.callbacks import ModelCheckpoint
 
 save_memory = False
 disable_verbosity()
@@ -62,10 +63,27 @@ tryon_data = [dataset8, dataset11]
 threed_data = [dataset5]
 
 # The ratio of each dataset is adjusted by setting the __len__ 
-dataset = ConcatDataset( image_data + video_data + tryon_data +  threed_data + video_data + tryon_data +  threed_data  )
-dataloader = DataLoader(dataset, num_workers=4, batch_size=batch_size, shuffle=True)
+dataset = ConcatDataset( image_data + video_data + tryon_data + threed_data + video_data + tryon_data + threed_data )
+dataloader = DataLoader(dataset, num_workers=8, batch_size=batch_size, shuffle=True)
 logger = ImageLogger(batch_frequency=logger_freq)
-trainer = pl.Trainer(gpus=n_gpus, strategy="ddp", precision=16, accelerator="gpu", callbacks=[logger], progress_bar_refresh_rate=1, accumulate_grad_batches=accumulate_grad_batches)
+checkpoint_callback = ModelCheckpoint(
+    dirpath="checkpoints/",
+    filename="{epoch}",  # 每个checkpoint的文件名会包含epoch的编号
+    save_top_k=-1,  # 保存所有的checkpoints
+    every_n_epochs=1,  # 每个epoch保存一次
+    verbose=True,
+)
+trainer = pl.Trainer(
+    gpus=n_gpus,
+    strategy="ddp",
+    precision=16,
+    accelerator="gpu",
+    callbacks=[logger, checkpoint_callback],  # 添加检查点回调
+    progress_bar_refresh_rate=1,
+    accumulate_grad_batches=accumulate_grad_batches,
+    max_epochs=12  # 设置训练的最大epoch数
+)
+
 
 # Train!
 trainer.fit(model, dataloader)

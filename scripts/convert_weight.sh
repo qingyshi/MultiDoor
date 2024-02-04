@@ -1,1 +1,1 @@
-python tool_add_control_sd21.py checkpoints/stable-diffusion-2-1/v2-1_768-ema-pruned.ckpt checkpoints/control_sd21_ini.ckpt
+python tool_add_control_sd21.py checkpoints/stable-diffusion-2-1-base/v2-1_512-ema-pruned.ckpt checkpoints/control_sd21_ini.ckpt
