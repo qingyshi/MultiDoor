@@ -51,12 +51,13 @@ class YoutubeVISDataset(BaseDataset):
             raise Exception
         objects_id = np.random.choice(obj_list, 2, replace=False)
         frames = [self.records[video_id]["objects"][single_id]["frames"] for single_id in objects_id]
+        names = [self.records[video_id]["objects"][single_id]["category"] for single_id in objects_id]
         frames = np.intersect1d(*frames)
 
         # Sampling frames
         min_interval = len(frames)  // 10
         start_frame_index = np.random.randint(low=0, high=len(frames) - min_interval)
-        end_frame_index = start_frame_index + np.random.randint(min_interval,  len(frames) - start_frame_index )
+        end_frame_index = start_frame_index + np.random.randint(min_interval,  len(frames) - start_frame_index)
         end_frame_index = min(end_frame_index, len(frames) - 1)
 
         # Get image path
@@ -85,5 +86,8 @@ class YoutubeVISDataset(BaseDataset):
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()
         item_with_collage['time_steps'] = sampled_time_steps
+        item_with_collage['names'] = names
+        item_with_collage['obj_ids'] = objects_id
+        item_with_collage['img_path'] = tar_image_path
         return item_with_collage
 

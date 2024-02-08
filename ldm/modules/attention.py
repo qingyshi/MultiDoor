@@ -159,6 +159,7 @@ class CrossAttention(nn.Module):
             nn.Linear(inner_dim, query_dim),
             nn.Dropout(dropout)
         )
+        self.cross_attn_map_store = None
 
     def forward(self, x, context=None, mask=None):
         h = self.heads
@@ -189,6 +190,9 @@ class CrossAttention(nn.Module):
         # attention, what we cannot get enough of
         sim = sim.softmax(dim=-1)
 
+        if self.cross_attn_map_store is not None:
+            self.cross_attn_map_store(sim)
+        
         out = einsum('b i j, b j d -> b i d', sim, v)
         out = rearrange(out, '(b h) n d -> b n (h d)', h=h)
         return self.to_out(out)

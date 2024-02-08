@@ -26,13 +26,13 @@ if save_memory:
 
 # Configs
 resume_path = 'checkpoints/control_sd21_ini.ckpt'
-batch_size = 8
+batch_size = 2
 logger_freq = 1000
 learning_rate = 1e-5
 sd_locked = False
 only_mid_control = False
-n_gpus = 4
-accumulate_grad_batches=1
+n_gpus = 1
+accumulate_grad_batches = 1
 
 # First use cpu to load models. Pytorch Lightning will automatically move it to GPUs.
 model = create_model('./configs/anydoor.yaml').cpu()
@@ -49,7 +49,7 @@ dataset3 = VIPSegDataset(**DConf.Train.VIPSeg)
 dataset4 = YoutubeVISDataset(**DConf.Train.YoutubeVIS) 
 dataset5 = MVImageNetDataset(**DConf.Train.MVImageNet)
 dataset6 = SAMDataset(**DConf.Train.SAM)
-# dataset7 = UVODataset(**DConf.Train.UVO.train)
+dataset7 = UVODataset(**DConf.Train.UVO.train)
 dataset8 = VitonHDDataset(**DConf.Train.VitonHD)
 # dataset9 = UVOValDataset(**DConf.Train.UVO.val)
 dataset10 = MoseDataset(**DConf.Train.Mose)
@@ -58,7 +58,7 @@ dataset12 = LvisDataset(**DConf.Train.Lvis)
 
 image_data = [dataset2, dataset6, dataset12]
 # video_data = [dataset1, dataset3, dataset4, dataset7, dataset9, dataset10 ]
-video_data = [dataset1, dataset3, dataset4, dataset10 ]
+video_data = [dataset1, dataset3, dataset4, dataset7, dataset10]
 tryon_data = [dataset8, dataset11]
 threed_data = [dataset5]
 
@@ -68,9 +68,9 @@ dataloader = DataLoader(dataset, num_workers=8, batch_size=batch_size, shuffle=T
 logger = ImageLogger(batch_frequency=logger_freq)
 checkpoint_callback = ModelCheckpoint(
     dirpath="checkpoints/",
-    filename="{epoch}",  # 每个checkpoint的文件名会包含epoch的编号
-    save_top_k=-1,  # 保存所有的checkpoints
-    every_n_epochs=1,  # 每个epoch保存一次
+    filename="{epoch}",
+    save_top_k=-1,
+    every_n_epochs=1,
     verbose=True,
 )
 trainer = pl.Trainer(
@@ -78,10 +78,10 @@ trainer = pl.Trainer(
     strategy="ddp",
     precision=16,
     accelerator="gpu",
-    callbacks=[logger, checkpoint_callback],  # 添加检查点回调
+    callbacks=[logger, checkpoint_callback],
     progress_bar_refresh_rate=1,
     accumulate_grad_batches=accumulate_grad_batches,
-    max_epochs=12  # 设置训练的最大epoch数
+    max_epochs=12
 )
 
 

@@ -101,19 +101,19 @@ class BaseDataset(Dataset):
     
 
     def process_pairs(self, ref_image, ref_mask, tar_image, tar_mask, max_ratio = 0.8):
-        assert mask_score(np.max(ref_mask, axis=0)) > 0.90
+        assert max(mask_score(ref_mask[0]), mask_score(ref_mask[1])) > 0.90
         assert self.check_mask_area(np.max(ref_mask, axis=0)) == True
         assert self.check_mask_area(np.max(tar_mask, axis=0)) == True
 
         '''
         inputs:
             ref_image: (H, W, 3)
-            ref_mask: (S, H, W)
+            ref_mask: (2, H, W)
             tar_image: (H, W, 3)
-            tar_mask: (S, H, W)
+            tar_mask: (2, H, W)
             
         outputs:
-            masked_ref_image_aug: (H, S * W, 3)
+            masked_ref_image_aug: (2, 224, 224, 3)
             cropped_target_image: (512, 512, 3)
             collage: (512, 512, 3)
         '''
@@ -174,9 +174,11 @@ class BaseDataset(Dataset):
 
         ref_mask_compose = np.concatenate(multi_subject_ref_mask, axis=1)
         ref_mask_3 = np.stack([ref_mask_compose, ref_mask_compose, ref_mask_compose], -1)
-        masked_ref_image_compose = np.concatenate(multi_subject_ref_image, axis=1)
-        masked_ref_image_aug = masked_ref_image_compose.copy()
-        ref_image_collage = sobel(masked_ref_image_compose, ref_mask_compose / 255) # (224, 448, 3)
+        masked_ref_image_compose = np.stack(multi_subject_ref_image, axis=0)
+        masked_ref_image_aug = masked_ref_image_compose.copy()  # (2, 224, 244, 3)
+        # ref_image_collage = sobel(masked_ref_image_compose, ref_mask_compose / 255) # (224, 448, 3)
+        multi_ref_image_collage = [sobel(masked_ref_image_compose, ref_mask_compose / 255) for 
+                                   masked_ref_image_compose in multi_subject_ref_image]
 
         
 
@@ -186,39 +188,37 @@ class BaseDataset(Dataset):
         
         for single_mask in tar_mask:
             tar_box_yyxx = get_bbox_from_mask(single_mask)
-            tar_box_yyxx = expand_bbox(single_mask, tar_box_yyxx, ratio=[1.1, 1.2]) #1.1  1.3
+            tar_box_yyxx = expand_bbox(single_mask, tar_box_yyxx, ratio=[1.1, 1.2]) # 1.1  1.3
             multi_subject_bbox.append(tar_box_yyxx)
             assert self.check_region_size(single_mask, tar_box_yyxx, ratio = max_ratio, mode = 'max') == True
             
             # Cropping around the target object 
             tar_box_yyxx_crop = expand_bbox(tar_image, tar_box_yyxx, ratio=[1.3, 3.0])   
             tar_box_yyxx_crop = box2squre(tar_image, tar_box_yyxx_crop) # crop box
-            y1, y2, x1, x2 = tar_box_yyxx_crop
             multi_subject_bbox_crop.append(tar_box_yyxx_crop)
         
+        # bbox which contains multi-subjects
         y1, x1 = min([[bbox[0], bbox[2]] for bbox in multi_subject_bbox_crop])
         y2, x2 = max([[bbox[1], bbox[3]] for bbox in multi_subject_bbox_crop])
         tar_box_yyxx_crop = (y1, y2, x1, x2)
         cropped_target_image = tar_image[y1: y2, x1: x2, :]
+        collage = cropped_target_image.copy()
+        collage_mask = cropped_target_image.copy() * 0.0
         tar_mask = np.max(tar_mask, axis=0)
         cropped_tar_mask = tar_mask[y1: y2, x1: x2]
         
-        y1, x1 = min([[bbox[0], bbox[2]] for bbox in multi_subject_bbox])
-        y2, x2 = max([[bbox[1], bbox[3]] for bbox in multi_subject_bbox])
-        tar_box_yyxx = (y1, y2, x1, x2)
-        tar_box_yyxx = box_in_box(tar_box_yyxx, tar_box_yyxx_crop)
-        y1, y2, x1, x2 = tar_box_yyxx
+        for single_bbox, ref_image_collage in zip(multi_subject_bbox, multi_ref_image_collage):
+            tar_box_yyxx = box_in_box(single_bbox, tar_box_yyxx_crop)
+            y1, y2, x1, x2 = tar_box_yyxx
 
-        # Prepairing collage image
-        ref_image_collage = cv2.resize(ref_image_collage.astype(np.uint8), (x2-x1, y2-y1))
-        ref_mask_compose = cv2.resize(ref_mask_compose.astype(np.uint8), (x2-x1, y2-y1))
-        ref_mask_compose = (ref_mask_compose > 128).astype(np.uint8)
+            # Prepairing collage image
+            ref_image_collage = cv2.resize(ref_image_collage.astype(np.uint8), (x2-x1, y2-y1))
+            ref_mask_compose = cv2.resize(ref_mask_compose.astype(np.uint8), (x2-x1, y2-y1))
+            ref_mask_compose = (ref_mask_compose > 128).astype(np.uint8)
 
-        collage = cropped_target_image.copy() 
-        collage[y1: y2, x1: x2, :] = ref_image_collage
-
-        collage_mask = cropped_target_image.copy() * 0.0
-        collage_mask[y1: y2, x1: x2, :] = 1.0
+            # stitch the hf map into the target image
+            collage[y1: y2, x1: x2, :] = ref_image_collage
+            collage_mask[y1: y2, x1: x2, :] = 1.0
 
         if np.random.uniform(0, 1) < 0.7: 
             cropped_tar_mask = perturb_mask(cropped_tar_mask)
@@ -237,7 +237,7 @@ class BaseDataset(Dataset):
         collage_mask[collage_mask == 2] = -1
         
         # Prepairing dataloader items
-        masked_ref_image_aug = masked_ref_image_aug  / 255 
+        masked_ref_image_aug = masked_ref_image_aug / 255 
         cropped_target_image = cropped_target_image / 127.5 - 1.0
         collage = collage / 127.5 - 1.0 
         collage = np.concatenate([collage, collage_mask[:, :, :1]] , -1)

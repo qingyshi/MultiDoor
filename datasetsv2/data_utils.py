@@ -99,7 +99,7 @@ def get_bbox_from_mask(mask):
     cols = np.any(mask,axis=0)
     y1,y2 = np.where(rows)[0][[0,-1]]
     x1,x2 = np.where(cols)[0][[0,-1]]
-    return (y1,y2,x1,x2)
+    return (y1, y2, x1, x2)
 
 
 def expand_bbox(mask,yyxx,ratio=[1.2,2.0], min_crop=0):
