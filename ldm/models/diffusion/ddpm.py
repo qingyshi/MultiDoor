@@ -840,7 +840,7 @@ class LatentDiffusion(DDPM):
 
     def forward(self, x, c, *args, **kwargs):
         #t = torch.randint(0, self.num_timesteps, (x.shape[0],), device=self.device).long()
-        t = self.time_steps.reshape( (x.shape[0],) ).to(self.device).long()  
+        t = self.time_steps.reshape((x.shape[0], )).to(self.device).long()  
         
         if self.model.conditioning_key is not None:
             assert c is not None

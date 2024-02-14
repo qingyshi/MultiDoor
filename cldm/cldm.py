@@ -341,7 +341,7 @@ class ControlLDM(LatentDiffusion):
 
     @torch.no_grad()
     def get_unconditional_conditioning(self, N):
-        uncond =  self.get_learned_conditioning([ torch.zeros((1,3,224,224)) ] * N)
+        uncond =  self.get_learned_conditioning([torch.zeros((1, 3, 224, 224))] * N)
         return uncond
 
     @torch.no_grad()
@@ -360,14 +360,14 @@ class ControlLDM(LatentDiffusion):
         log["reconstruction"] = self.decode_first_stage(z) 
 
         # ==== visualize the shape mask or the high-frequency map ====
-        guide_mask = (c_cat[:,-1,:,:].unsqueeze(1) + 1) * 0.5
-        guide_mask = torch.cat([guide_mask,guide_mask,guide_mask],1)
-        HF_map  = c_cat[:,:3,:,:] #* 2.0 - 1.0
+        guide_mask = (c_cat[:, -1, :, :].unsqueeze(1) + 1) * 0.5
+        guide_mask = torch.cat([guide_mask, guide_mask, guide_mask], 1)
+        HF_map  = c_cat[:, :3, :, :]  # * 2.0 - 1.0
 
         log["control"] = HF_map
 
         cond_image = batch[self.cond_stage_key].cpu().numpy().copy() 
-        log["conditioning"] = torch.permute( torch.tensor(cond_image), (0,3,1,2)) * 2.0 - 1.0  
+        log["conditioning"] = torch.permute(torch.tensor(cond_image), (0, 3, 1, 2)) * 2.0 - 1.0  
         if plot_diffusion_rows:
             # get diffusion row
             diffusion_row = list()

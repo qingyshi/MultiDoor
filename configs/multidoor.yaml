@@ -1,5 +1,5 @@
 model:
-  target: cldm.cldm.MultiDoor
+  target: cldm.multidoor.MultiDoor
   params:
     linear_start: 0.00085
     linear_end: 0.0120
@@ -35,7 +35,7 @@ model:
         use_spatial_transformer: True
         use_linear_in_transformer: True
         transformer_depth: 1
-        context_dim: 768
+        context_dim: 1024
         legacy: False
 
     unet_config:
@@ -82,15 +82,17 @@ model:
 
     cond_stage_config:
       target: ldm.modules.encoders.modules.FrozenDinoV2Encoder
+      # params:
+      #   freeze: False
       weight: checkpoints/dinov2_vitg14_pretrain.pth
     
     text_encoder_config:
-      target: ldm.modules.encoders.modules.FrozenCLIPEmbedder
+      target: cldm.multidoor.FrozenTextEmbedder
       params:
-        version: "/data00/sqy/LLaVA/clip-vit-large-patch14"
+        version: "checkpoints/stable-diffusion-2-1-base"
     
     fusion_module_config:
-      target: cldm.cldm.FusionModule
+      target: cldm.multidoor.FusionModule
       params:
-        text_dim: 768
+        text_dim: 1024
         subject_dim: 1024

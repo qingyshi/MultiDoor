@@ -44,6 +44,7 @@ Train:
   Lvis:
     image_dir: /data00/datasets/coco/train2017
     json_path: /data00/LVIS/lvis_v1_train.json
+    caption_path: /data00/sqy/caption_lvis_good.json
 
   SAM:
     sub1: /data00/sam/0000

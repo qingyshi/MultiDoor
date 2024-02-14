@@ -1,2 +1,2 @@
 unset WORLD_SIZE
-python run_train_anydoor.py
+python run_train_multidoor.py
