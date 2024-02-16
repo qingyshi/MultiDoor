@@ -57,6 +57,10 @@ Train:
     TR_root: /data00/DUT/DUTS-TR-Image/
     TE_root: /data00/DUT/DUTS-TE-Image/
     HFlickr_root: /data00/HFlickr/masks/
+  
+  COCO:
+    root: /data00/coco/train2017
+    annotation: /data00/coco/annotations/instances_train2017.json
 
 Test:
   DreamBooth:

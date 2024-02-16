@@ -147,3 +147,5 @@ checkpoints/
 hf_down.py
 cache_dir/
 .vscode/
+.demo
+.data

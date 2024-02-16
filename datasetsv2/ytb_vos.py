@@ -46,13 +46,16 @@ class YoutubeVOSDataset(BaseDataset):
 
     def get_sample(self, idx):
         video_id = list(self.records.keys())[idx]
-        objects_id = np.random.choice( list(self.records[video_id]["objects"].keys()) )
-        frames = self.records[video_id]["objects"][objects_id]["frames"]
+        objects = list(self.records[video_id]["objects"].keys())
+        if len(objects) >= 2:
+            objects_ids = np.random.choice(list(self.records[video_id]["objects"].keys()), 2, replace=False)
+        frames = np.intersect1d(*[self.records[video_id]["objects"][objects_id]["frames"] for objects_id in objects_ids])
+        names = [self.records[video_id]["objects"][objects_id]["category"] for objects_id in objects_ids]
 
         # Sampling frames
         min_interval = len(frames)  // 10
         start_frame_index = np.random.randint(low=0, high=len(frames) - min_interval)
-        end_frame_index = start_frame_index + np.random.randint(min_interval,  len(frames) - start_frame_index )
+        end_frame_index = start_frame_index + np.random.randint(min_interval,  len(frames) - start_frame_index)
         end_frame_index = min(end_frame_index, len(frames) - 1)
 
         # Get image path
@@ -72,16 +75,20 @@ class YoutubeVOSDataset(BaseDataset):
 
         ref_mask = Image.open(ref_mask_path ).convert('P')
         ref_mask= np.array(ref_mask)
-        ref_mask = ref_mask == int(objects_id)
+        ref_mask = [ref_mask == int(objects_id) for objects_id in objects_ids]
 
         tar_mask = Image.open(tar_mask_path ).convert('P')
         tar_mask= np.array(tar_mask)
-        tar_mask = tar_mask == int(objects_id)
+        tar_mask = [tar_mask == int(objects_id) for objects_id in objects_ids]
 
-
+        ref_mask = np.stack(ref_mask, axis=0)
+        tar_mask = np.stack(tar_mask, axis=0)
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()
         item_with_collage['time_steps'] = sampled_time_steps
+        item_with_collage['names'] = names
+        item_with_collage['obj_ids'] = objects_ids
+        item_with_collage['img_path'] = tar_image_path  
         return item_with_collage
 
 

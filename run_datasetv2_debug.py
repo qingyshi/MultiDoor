@@ -1,16 +1,17 @@
-from datasets.ytb_vos import YoutubeVOSDataset
+from datasetsv2.ytb_vos import YoutubeVOSDataset
 from datasetsv2.ytb_vis import YoutubeVISDataset
-from datasets.saliency_modular import SaliencyDataset
-from datasets.vipseg import VIPSegDataset
-from datasets.mvimagenet import MVImageNetDataset
-from datasets.sam import SAMDataset
-from datasets.dreambooth import DreamBoothDataset
-from datasets.uvo import UVODataset
-from datasets.uvo_val import UVOValDataset
-from datasets.mose import MoseDataset
-from datasets.vitonhd import VitonHDDataset
-from datasets.fashiontryon import FashionTryonDataset
+from datasetsv2.saliency_modular import SaliencyDataset
+from datasetsv2.vipseg import VIPSegDataset
+from datasetsv2.mvimagenet import MVImageNetDataset
+from datasetsv2.sam import SAMDataset
+from datasetsv2.dreambooth import DreamBoothDataset
+from datasetsv2.uvo import UVODataset
+from datasetsv2.uvo_val import UVOValDataset
+from datasetsv2.mose import MoseDataset
+from datasetsv2.vitonhd import VitonHDDataset
+from datasetsv2.fashiontryon import FashionTryonDataset
 from datasetsv2.lvis import LvisDataset
+from datasetsv2.coco import CocoDataset
 from torch.utils.data import ConcatDataset
 from torch.utils.data import DataLoader
 import numpy as np 
@@ -31,9 +32,10 @@ DConf = OmegaConf.load('./configs/datasetsv2.yaml')
 # dataset9 = UVOValDataset(**DConf.Train.UVO.val)
 # dataset10 = MoseDataset(**DConf.Train.Mose)
 # dataset11 = FashionTryonDataset(**DConf.Train.FashionTryon)
-dataset12 = LvisDataset(**DConf.Train.Lvis)
+# dataset12 = LvisDataset(**DConf.Train.Lvis)
+dataset13 = CocoDataset(**DConf.Train.COCO)
 
-dataset = dataset12
+dataset = dataset13
 
 
 def vis_sample(item):
@@ -51,7 +53,7 @@ def vis_sample(item):
     ref = cv2.resize(ref.astype(np.uint8), (512, 512))
     vis = cv2.hconcat([ref.astype(np.float32), hint_image.astype(np.float32), hint_mask.astype(np.float32), tar.astype(np.float32)])
     cv2.imwrite('sample_vis.jpg', vis[:, :, ::-1])
-    print(item['caption'][0])
+    # print(item['caption'][0])
     print(item['names'][0])
 
 
@@ -60,5 +62,3 @@ print('len dataloader: ', len(dataloader))
 for data in dataloader:
     vis_sample(data) 
     continue
-
-
