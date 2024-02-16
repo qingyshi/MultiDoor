@@ -9,7 +9,7 @@ from .data_utils import *
 from .base import BaseDataset
 
 class YoutubeVISDataset(BaseDataset):
-    def __init__(self, image_dir, anno, meta):
+    def __init__(self, image_dir, anno, meta, caption):
         self.image_root = image_dir
         self.anno_root = anno 
         self.meta_file = meta
@@ -20,8 +20,12 @@ class YoutubeVISDataset(BaseDataset):
             records = records["videos"]
             for video_id in records:
                 video_dirs.append(video_id)
+        
+        with open(caption) as f:
+            caption = json.laod(f)
 
         self.records = records
+        self.caption = caption
         self.data = video_dirs
         self.size = (512,512)
         self.clip_size = (224,224)
@@ -46,6 +50,9 @@ class YoutubeVISDataset(BaseDataset):
 
     def get_sample(self, idx):
         video_id = list(self.records.keys())[idx]
+        if video_id not in self.caption:
+            raise Exception
+        caption_ann = self.caption[video_id]
         obj_list = list(self.records[video_id]["objects"].keys())
         if len(obj_list) <= 1:
             raise Exception
