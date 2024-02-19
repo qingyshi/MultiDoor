@@ -12,6 +12,7 @@ from datasetsv2.mose import MoseDataset
 from datasetsv2.vitonhd import VitonHDDataset
 from datasetsv2.fashiontryon import FashionTryonDataset
 from datasetsv2.lvis import LvisDataset
+from datasetsv2.coco import CocoDataset
 from cldm.logger import ImageLogger
 from cldm.model import create_model, load_state_dict
 from torch.utils.data import ConcatDataset
@@ -25,9 +26,9 @@ if save_memory:
     enable_sliced_attention()
 
 # Configs
-resume_path = 'checkpoints/control_sd21_ini.ckpt'
+resume_path = 'checkpoints/epoch=1.ckpt'
 batch_size = 6
-logger_freq = 200
+logger_freq = 1000
 learning_rate = 1e-5
 sd_locked = False
 only_mid_control = False
@@ -35,7 +36,7 @@ n_gpus = 4
 accumulate_grad_batches = 1
 
 # First use cpu to load models. Pytorch Lightning will automatically move it to GPUs.
-model = create_model('./configs/multidoor.yaml').cpu()
+model = create_model('./configs/multidoorv2.yaml').cpu()
 model.load_state_dict(load_state_dict(resume_path, location='cpu'), strict=False)
 model.learning_rate = learning_rate
 model.sd_locked = sd_locked
@@ -43,10 +44,10 @@ model.only_mid_control = only_mid_control
 
 # datasetsv2
 DConf = OmegaConf.load('./configs/datasetsv2.yaml')
-# dataset1 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)  
+dataset1 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)  
 # dataset2 =  SaliencyDataset(**DConf.Train.Saliency) 
-# dataset3 = VIPSegDataset(**DConf.Train.VIPSeg) 
-# dataset4 = YoutubeVISDataset(**DConf.Train.YoutubeVIS) 
+dataset3 = VIPSegDataset(**DConf.Train.VIPSeg) 
+dataset4 = YoutubeVISDataset(**DConf.Train.YoutubeVIS) 
 # dataset5 = MVImageNetDataset(**DConf.Train.MVImageNet)
 # dataset6 = SAMDataset(**DConf.Train.SAM)
 # dataset7 = UVODataset(**DConf.Train.UVO.train)
@@ -55,16 +56,18 @@ DConf = OmegaConf.load('./configs/datasetsv2.yaml')
 # dataset10 = MoseDataset(**DConf.Train.Mose)
 # dataset11 = FashionTryonDataset(**DConf.Train.FashionTryon)
 dataset12 = LvisDataset(**DConf.Train.Lvis)
+dataset13 = CocoDataset(**DConf.Train.COCO)
 
 # image_data = [dataset2, dataset6, dataset12]
 # video_data = [dataset1, dataset3, dataset4, dataset7, dataset9, dataset10 ]
 # video_data = [dataset1, dataset3, dataset4, dataset7, dataset10]
 # tryon_data = [dataset8, dataset11]
 # threed_data = [dataset5]
-image_data = dataset12
-dataset = image_data
+image_data = [dataset12, dataset13]
+video_data = [dataset1, dataset3, dataset4]
+
 # The ratio of each dataset is adjusted by setting the __len__ 
-# dataset = ConcatDataset( image_data + video_data + tryon_data + threed_data + video_data + tryon_data + threed_data )
+dataset = ConcatDataset(image_data + video_data + video_data)
 dataloader = DataLoader(dataset, num_workers=8, batch_size=batch_size, shuffle=True)
 logger = ImageLogger(batch_frequency=logger_freq)
 checkpoint_callback = ModelCheckpoint(
@@ -82,7 +85,7 @@ trainer = pl.Trainer(
     callbacks=[logger, checkpoint_callback],
     progress_bar_refresh_rate=1,
     accumulate_grad_batches=accumulate_grad_batches,
-    max_epochs=12
+    max_epochs=24
 )
 
 

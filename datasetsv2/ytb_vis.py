@@ -22,7 +22,7 @@ class YoutubeVISDataset(BaseDataset):
                 video_dirs.append(video_id)
         
         with open(caption) as f:
-            caption = json.laod(f)
+            caption = json.load(f)
 
         self.records = records
         self.caption = caption
@@ -52,17 +52,22 @@ class YoutubeVISDataset(BaseDataset):
         video_id = list(self.records.keys())[idx]
         if video_id not in self.caption:
             raise Exception
-        caption_ann = self.caption[video_id]
-        obj_list = list(self.records[video_id]["objects"].keys())
-        if len(obj_list) <= 1:
-            raise Exception
-        objects_id = np.random.choice(obj_list, 2, replace=False)
-        frames = [self.records[video_id]["objects"][single_id]["frames"] for single_id in objects_id]
-        names = [self.records[video_id]["objects"][single_id]["category"] for single_id in objects_id]
+        else:
+            caption_ann = self.caption[video_id]
+            caption = caption_ann['caption']
+            class_token_ids = caption_ann['class_token_ids']
+        
+        # obj_list = list(self.records[video_id]["objects"].keys())
+        # if len(obj_list) <= 1:
+        #     raise Exception
+        # objects_id = np.random.choice(obj_list, 2, replace=False)
+        objects_ids = caption_ann['obj_ids']
+        frames = [self.records[video_id]["objects"][str(single_id)]["frames"] for single_id in objects_ids]
+        names = [self.records[video_id]["objects"][str(single_id)]["category"] for single_id in objects_ids]
         frames = np.intersect1d(*frames)
 
         # Sampling frames
-        min_interval = len(frames)  // 10
+        min_interval = len(frames) // 10
         start_frame_index = np.random.randint(low=0, high=len(frames) - min_interval)
         end_frame_index = start_frame_index + np.random.randint(min_interval,  len(frames) - start_frame_index)
         end_frame_index = min(end_frame_index, len(frames) - 1)
@@ -84,17 +89,21 @@ class YoutubeVISDataset(BaseDataset):
 
         ref_mask = Image.open(ref_mask_path).convert('P')
         ref_mask= np.array(ref_mask)
-        ref_mask = np.stack([ref_mask == int(single_id) for single_id in objects_id], 0)
+        ref_mask = np.stack([ref_mask == int(single_id) for single_id in objects_ids], 0)
 
         tar_mask = Image.open(tar_mask_path).convert('P')
         tar_mask= np.array(tar_mask)
-        tar_mask = np.stack([tar_mask == int(single_id) for single_id in objects_id], 0)
+        tar_mask = np.stack([tar_mask == int(single_id) for single_id in objects_ids], 0)
 
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()
+        
         item_with_collage['time_steps'] = sampled_time_steps
-        item_with_collage['names'] = names
-        item_with_collage['obj_ids'] = objects_id
-        item_with_collage['img_path'] = tar_image_path
+        # item_with_collage['names'] = names
+        # item_with_collage['obj_ids'] = objects_ids
+        # item_with_collage['img_path'] = tar_image_path
+        # item_with_collage['video_id'] = video_id
+        item_with_collage['caption'] = caption
+        item_with_collage['class_token_ids'] = torch.tensor(class_token_ids)
         return item_with_collage
 

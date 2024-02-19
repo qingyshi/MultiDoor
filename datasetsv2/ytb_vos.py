@@ -9,7 +9,7 @@ from .data_utils import *
 from .base import BaseDataset
 
 class YoutubeVOSDataset(BaseDataset):
-    def __init__(self, image_dir, anno, meta):
+    def __init__(self, image_dir, anno, meta, caption):
         self.image_root = image_dir
         self.anno_root = anno
         self.meta_file = meta
@@ -20,7 +20,11 @@ class YoutubeVOSDataset(BaseDataset):
             records = records["videos"]
             for video_id in records:
                 video_dirs.append(video_id)
+        
+        with open(caption) as f:
+            caption = json.load(f)
 
+        self.caption = caption
         self.records = records
         self.data = video_dirs
         self.size = (512,512)
@@ -46,14 +50,23 @@ class YoutubeVOSDataset(BaseDataset):
 
     def get_sample(self, idx):
         video_id = list(self.records.keys())[idx]
-        objects = list(self.records[video_id]["objects"].keys())
-        if len(objects) >= 2:
-            objects_ids = np.random.choice(list(self.records[video_id]["objects"].keys()), 2, replace=False)
-        frames = np.intersect1d(*[self.records[video_id]["objects"][objects_id]["frames"] for objects_id in objects_ids])
-        names = [self.records[video_id]["objects"][objects_id]["category"] for objects_id in objects_ids]
+        
+        if video_id not in self.caption:
+            raise Exception
+        else:
+            caption_ann = self.caption[video_id]
+            caption = caption_ann['caption']
+            class_token_ids = caption_ann['class_token_ids']
+            objects_ids = caption_ann['obj_ids']
+        
+        # objects = list(self.records[video_id]["objects"].keys())
+        # if len(objects) >= 2:
+        #     objects_ids = np.random.choice(list(self.records[video_id]["objects"].keys()), 2, replace=False)
+        frames = np.intersect1d(*[self.records[video_id]["objects"][str(objects_id)]["frames"] for objects_id in objects_ids])
+        names = [self.records[video_id]["objects"][str(objects_id)]["category"] for objects_id in objects_ids]
 
         # Sampling frames
-        min_interval = len(frames)  // 10
+        min_interval = len(frames) // 10
         start_frame_index = np.random.randint(low=0, high=len(frames) - min_interval)
         end_frame_index = start_frame_index + np.random.randint(min_interval,  len(frames) - start_frame_index)
         end_frame_index = min(end_frame_index, len(frames) - 1)
@@ -85,10 +98,14 @@ class YoutubeVOSDataset(BaseDataset):
         tar_mask = np.stack(tar_mask, axis=0)
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()
+        
         item_with_collage['time_steps'] = sampled_time_steps
-        item_with_collage['names'] = names
-        item_with_collage['obj_ids'] = objects_ids
-        item_with_collage['img_path'] = tar_image_path  
+        # item_with_collage['names'] = names
+        # item_with_collage['obj_ids'] = objects_ids
+        # item_with_collage['img_path'] = tar_image_path
+        # item_with_collage['video_id'] = video_id
+        item_with_collage['caption'] = caption
+        item_with_collage['class_token_ids'] = torch.tensor(class_token_ids)
         return item_with_collage
 
 

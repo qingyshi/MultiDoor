@@ -420,7 +420,10 @@ class DDPM(pl.LightningModule):
         x = batch[k]
         if len(x.shape) == 3:
             x = x[..., None]
-        x = rearrange(x, 'b h w c -> b c h w')
+        if len(x.shape) == 4:
+            x = rearrange(x, 'b h w c -> b c h w')
+        elif len(x.shape) == 5:
+            x = rearrange(x, 'b n h w c -> b n c h w')
         x = x.to(memory_format=torch.contiguous_format).float()
         return x
 

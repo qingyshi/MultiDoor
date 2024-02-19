@@ -3,16 +3,19 @@ Train:
     image_dir: /data00/youtube_vos_2019/train/JPEGImages/
     anno: /data00/youtube_vos_2019/train/Annotations/
     meta: /data00/youtube_vos_2019/train/meta.json
+    caption: /data00/sqy/caption_ytvos_good.json
 
   YoutubeVIS:
     image_dir: /data00/datasets/youtube_vis_2019/train/JPEGImages/
     anno: /data00/datasets/youtube_vis_2019/train/Annotations/
     meta: /data00/datasets/youtube_vis_2019/train/meta.json
+    caption: /data00/sqy/caption_ytvis_good.json
 
   VIPSeg:
     image_dir: /data00/VIPSeg/VIPSeg_720P/images/
     anno: /data00/VIPSeg/VIPSeg_720P/panomasksRGB/
     meta: /data00/VIPSeg/VIPSeg_720P/panoptic_gt_VIPSeg.json
+    caption: /data00/sqy/caption_vipseg_good.json
 
   UVO:
     train:
@@ -59,8 +62,9 @@ Train:
     HFlickr_root: /data00/HFlickr/masks/
   
   COCO:
-    root: /data00/coco/train2017
-    annotation: /data00/coco/annotations/instances_train2017.json
+    root: /data00/datasets/coco/train2017
+    annotation: /data00/datasets/coco/annotations/instances_train2017.json
+    caption: /data00/sqy/caption_coco_good.json
 
 Test:
   DreamBooth:

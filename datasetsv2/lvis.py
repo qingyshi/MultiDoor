@@ -40,6 +40,7 @@ class LvisDataset(BaseDataset):
             caption_ann = self.caption[image_name]
             caption = caption_ann['caption']
             class_token_ids = caption_ann['class_token_ids']
+            
         image_path = os.path.join(self.image_dir, image_name)
         image = cv2.imread(image_path)
         ref_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -69,14 +70,14 @@ class LvisDataset(BaseDataset):
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()
         item_with_collage['time_steps'] = sampled_time_steps
-        item_with_collage['names'] = " ".join(names)
+        # item_with_collage['names'] = names
+        # item_with_collage['img_path'] = image_path
         item_with_collage['caption'] = caption
         item_with_collage['class_token_ids'] = torch.tensor(class_token_ids)
-        item_with_collage['img_path'] = image_path
         return item_with_collage
 
     def __len__(self):
-        return 20000
+        return 2000
 
     def check_region_size(self, image, yyxx, ratio, mode = 'max'):
         pass_flag = True
