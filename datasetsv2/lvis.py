@@ -52,28 +52,25 @@ class LvisDataset(BaseDataset):
         for i in range(len(anno)):
             obj = anno[i]
             area = obj['area']
-            category_id = obj['category_id']
-            category_info = self.lvis_api.cats[category_id]
-            name = category_info['name']
+            # category_id = obj['category_id']
+            # category_info = self.lvis_api.cats[category_id]
+            # name = category_info['name']
             if area > 3600:
                 obj_ids.append(i)
-                names.append(name)
+                # names.append(name)
                 if len(obj_ids) == 2:
                     break
         assert len(anno) > 0
-        if len(obj_ids) == 2:
-            annos = [anno[obj_id] for obj_id in obj_ids]
-            ref_mask = np.stack([self.lvis_api.ann_to_mask(anno) for anno in annos], axis=0)
-        else:
-            raise Exception
+        annos = [anno[obj_id] for obj_id in obj_ids]
+        ref_mask = [self.lvis_api.ann_to_mask(anno) for anno in annos]
+
         tar_image, tar_mask = ref_image.copy(), ref_mask.copy()
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()
         item_with_collage['time_steps'] = sampled_time_steps
-        # item_with_collage['names'] = names
-        # item_with_collage['img_path'] = image_path
-        item_with_collage['caption'] = caption
-        item_with_collage['class_token_ids'] = torch.tensor(class_token_ids)
+        item_with_collage['img_path'] = image_path
+        # item_with_collage['caption'] = caption
+        # item_with_collage['class_token_ids'] = torch.tensor(class_token_ids)
         return item_with_collage
 
     def __len__(self):

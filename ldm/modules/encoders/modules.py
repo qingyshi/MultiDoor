@@ -165,7 +165,7 @@ class FrozenOpenCLIPEmbedder(AbstractEncoder):
         assert layer in self.LAYERS
         model, _, _ = open_clip.create_model_and_transforms(arch, device=torch.device('cpu'), pretrained=version)
         del model.visual
-        self.model = model
+        self.model = model.to(device)
 
         self.device = device
         self.max_length = max_length
@@ -271,6 +271,7 @@ class FrozenOpenCLIPImageEncoder(AbstractEncoder):
 
 sys.path.append("./dinov2")
 import hubconf
+from einops import rearrange
 from omegaconf import OmegaConf
 config_path = './configs/anydoor.yaml'
 config = OmegaConf.load(config_path)
@@ -301,14 +302,18 @@ class FrozenDinoV2Encoder(AbstractEncoder):
     def forward(self, image):
         if isinstance(image,list):
             image = torch.cat(image, 0)
+        if len(image.shape) == 5:
+            b, n, c, h, w = image.shape
+            image = rearrange(image, 'b n c h w -> (b n) c h w')
 
         image = (image.to(self.device)  - self.image_mean.to(self.device)) / self.image_std.to(self.device)
         features = self.model.forward_features(image)
         tokens = features["x_norm_patchtokens"]
         image_features  = features["x_norm_clstoken"]
         image_features = image_features.unsqueeze(1)
-        hint = torch.cat([image_features, tokens], 1)  # (8, 257, 1024)
-        hint = self.projector(hint)
+        hint = torch.cat([image_features, tokens], 1)  
+        hint = self.projector(hint)     # (b * n, 257, 1024)
+        hint = hint.reshape(b, n, 257, 1024).flatten(1, 2)
         return hint
 
     def encode(self, image):

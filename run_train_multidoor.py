@@ -26,7 +26,7 @@ if save_memory:
     enable_sliced_attention()
 
 # Configs
-resume_path = 'checkpoints/epoch=1.ckpt'
+resume_path = 'checkpoints/epoch=10.ckpt'
 batch_size = 6
 logger_freq = 1000
 learning_rate = 1e-5
@@ -85,7 +85,7 @@ trainer = pl.Trainer(
     callbacks=[logger, checkpoint_callback],
     progress_bar_refresh_rate=1,
     accumulate_grad_batches=accumulate_grad_batches,
-    max_epochs=24
+    max_epochs=12
 )
 
 

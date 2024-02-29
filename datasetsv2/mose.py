@@ -22,7 +22,7 @@ class MoseDataset(BaseDataset):
         self.dynamic = 2
 
     def __len__(self):
-        return 40000
+        return len(self.data)
 
     def check_region_size(self, image, yyxx, ratio, mode = 'max'):
         pass_flag = True
@@ -76,15 +76,21 @@ class MoseDataset(BaseDataset):
 
         common_ids = list(np.intersect1d(ref_ids, tar_ids))
         common_ids = [ i  for i in common_ids if i != 0 ]
-        assert len(common_ids) > 0 
-        chosen_id = np.random.choice(common_ids)
-        ref_mask = ref_mask == chosen_id 
-        tar_mask = tar_mask == chosen_id 
-        len_mask = len( self.check_connect( ref_mask.astype(np.uint8) ) )
+        assert len(common_ids) > 0
+        if len(common_ids) >= 2:
+            chosen_ids = np.random.choice(common_ids, 2, replace=False)
+        else:
+            chosen_ids = np.array(common_ids)
+        ref_mask = [ref_mask == chosen_id for chosen_id in chosen_ids]
+        tar_mask = [tar_mask == chosen_id for chosen_id in chosen_ids]
+        len_mask = len( self.check_connect( ref_mask[0].astype(np.uint8) ) )
         assert len_mask == 1
-        item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
+        item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask, mkdata=True)
         sampled_time_steps = self.sample_timestep()
         item_with_collage['time_steps'] = sampled_time_steps
+        item_with_collage['img_path'] = tar_image_path
+        item_with_collage['video_id'] = video_name
+        
         return item_with_collage
 
     def check_connect(self, mask):

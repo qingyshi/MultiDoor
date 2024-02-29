@@ -21,10 +21,10 @@ class VIPSegDataset(BaseDataset):
         self.clip_size = (224,224)
         self.dynamic = 1
         
-        with open(caption, 'r') as file:
-            caption = json.load(file)
+        # with open(caption, 'r') as file:
+        #     caption = json.load(file)
             
-        self.caption = caption
+        # self.caption = caption
         # with open(meta, 'r') as file:
         #     ann = json.load(file)
         
@@ -39,7 +39,7 @@ class VIPSegDataset(BaseDataset):
         #     self.id2is_thing[cat['id']] = cat['isthing']
 
     def __len__(self):
-        return 30000
+        return len(self.data)
 
     def check_region_size(self, image, yyxx, ratio, mode = 'max'):
         pass_flag = True
@@ -57,13 +57,12 @@ class VIPSegDataset(BaseDataset):
 
     def get_sample(self, idx):
         video_name = self.data[idx]
+        
         if video_name not in self.caption:
             raise Exception
         else:
             caption_ann = self.caption[video_name]
             caption = caption_ann['caption']
-            class_token_ids = caption_ann['class_token_ids']
-            obj_ids = caption_ann['obj_ids']
             
         # ann_per_frame = self.vid_name2ann_per_frame[video_name]     # list
         video_path = os.path.join(self.image_root, video_name)
@@ -75,7 +74,7 @@ class VIPSegDataset(BaseDataset):
         end_frame_index = start_frame_index + np.random.randint(min_interval, len(frames) - start_frame_index)
         end_frame_index = min(end_frame_index, len(frames) - 1)
         # end_frame_ann = ann_per_frame[end_frame_index]
-        start_end_frame_index = [start_frame_index, end_frame_index]
+        # start_end_frame_index = [start_frame_index, end_frame_index]
         
         # Get image path
         ref_image_name = frames[start_frame_index]
@@ -104,24 +103,21 @@ class VIPSegDataset(BaseDataset):
 
         common_ids = list(np.intersect1d(ref_ids, tar_ids))
         common_ids = [i for i in common_ids if i != 0]
-
-        if len(common_ids) < 2:
-            raise Exception
         
-        # chosen_id = np.random.choice(common_ids, 2, replace=False)
+        if len(common_ids) >= 2:
+            chosen_id = np.random.choice(common_ids, 2, replace=False)
+        else:
+            chosen_id = np.array(common_ids)
         # chosen_cat_id = []
         # for single_id in chosen_id:
         #     obj_ids = [obj['id'] for obj in end_frame_ann['segments_info']]
         #     chosen_cat_id.append(obj_ids.index(single_id))
         
-        chosen_id = obj_ids        
+        # chosen_id = obj_ids        
         # names = [self.id2name[cat_id] for cat_id in chosen_cat_id]
         
         ref_mask = [ref_mask == single_id for single_id in chosen_id]
         tar_mask = [tar_mask == single_id for single_id in chosen_id]
-        
-        ref_mask = np.stack(ref_mask, axis=0)
-        tar_mask = np.stack(tar_mask, axis=0)
 
         len_mask = len(self.check_connect(ref_mask[0].astype(np.uint8)))
         assert len_mask == 1
@@ -130,13 +126,9 @@ class VIPSegDataset(BaseDataset):
         sampled_time_steps = self.sample_timestep()
         
         item_with_collage['time_steps'] = sampled_time_steps
-        # item_with_collage['names'] = names
-        # item_with_collage['start_end_frame_index'] = start_end_frame_index
-        # item_with_collage['obj_ids'] = chosen_id
         # item_with_collage['video_id'] = video_name
         # item_with_collage['img_path'] = tar_image_path
         item_with_collage['caption'] = caption
-        item_with_collage['class_token_ids'] = torch.tensor(class_token_ids)
         return item_with_collage
 
     def check_connect(self, mask):

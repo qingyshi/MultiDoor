@@ -10,7 +10,6 @@ model:
     cond_stage_key: "ref"
     control_key: "hint"
     text_key: "caption"
-    class_token_key: "class_token_ids"
     image_size: 64
     channels: 4
     cond_stage_trainable: false
@@ -82,17 +81,9 @@ model:
 
     cond_stage_config:
       target: ldm.modules.encoders.modules.FrozenDinoV2Encoder
-      # params:
-      #   freeze: False
       weight: checkpoints/dinov2_vitg14_pretrain.pth
     
     text_encoder_config:
       target: cldm.multidoor.FrozenTextEmbedder
       params:
         version: "checkpoints/stable-diffusion-2-1-base"
-    
-    fusion_module_config:
-      target: cldm.multidoor.FusionModule
-      params:
-        text_dim: 1024
-        subject_dim: 1024

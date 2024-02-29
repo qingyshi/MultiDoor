@@ -91,18 +91,18 @@ def resize_box(yyxx, H,W,h,w):
 
 
 def get_bbox_from_mask(mask):
-    h,w = mask.shape[0],mask.shape[1]
+    h,w = mask.shape[0], mask.shape[1]
 
     if mask.sum() < 10:
-        return 0,h,0,w
-    rows = np.any(mask,axis=1)
-    cols = np.any(mask,axis=0)
-    y1,y2 = np.where(rows)[0][[0,-1]]
-    x1,x2 = np.where(cols)[0][[0,-1]]
-    return (y1,y2,x1,x2)
+        return 0, h, 0, w
+    rows = np.any(mask, axis=1)
+    cols = np.any(mask, axis=0)
+    y1, y2 = np.where(rows)[0][[0, -1]]
+    x1, x2 = np.where(cols)[0][[0, -1]]
+    return (y1, y2, x1, x2)
 
 
-def expand_bbox(mask,yyxx,ratio=[1.2,2.0], min_crop=0):
+def expand_bbox(mask, yyxx, ratio=[1.2,2.0], min_crop=0):
     y1,y2,x1,x2 = yyxx
     ratio = np.random.randint( ratio[0] * 10,  ratio[1] * 10 ) / 10
     H,W = mask.shape[0], mask.shape[1]
@@ -169,7 +169,7 @@ def pad_to_square(image, pad_value = 255, random = False):
 def box_in_box(small_box, big_box):
     y1,y2,x1,x2 = small_box
     y1_b, _, x1_b, _ = big_box
-    y1,y2,x1,x2 = y1 - y1_b ,y2 - y1_b, x1 - x1_b ,x2 - x1_b
+    y1, y2, x1, x2 = y1 - y1_b ,y2 - y1_b, x1 - x1_b, x2 - x1_b
     return (y1,y2,x1,x2 )
 
 

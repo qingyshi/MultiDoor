@@ -8,23 +8,6 @@ from torchvision.utils import make_grid
 from diffusers import StableDiffusionPipeline
 
 
-class FusionModule(nn.Module):
-    def __init__(self, text_dim, subject_dim):
-        super().__init__()
-        self.text_dim = text_dim
-        self.subject_dim = subject_dim
-        self.fusion_dim = text_dim + subject_dim
-        self.MLP = nn.Sequential(
-            nn.Linear(self.fusion_dim, self.text_dim),
-            nn.SiLU(),
-            nn.Dropout(p=0.1),
-            nn.Linear(self.text_dim, self.text_dim)
-        )
-    
-    def forward(self, fusion_emb):
-        return self.MLP(fusion_emb)
-
-
 class FrozenTextEmbedder(AbstractEncoder):
     """Uses the CLIP transformer encoder for text (from huggingface)"""
     LAYERS = [
@@ -75,32 +58,19 @@ class FrozenTextEmbedder(AbstractEncoder):
         
 
 class MultiDoor(ControlLDM):
-    def __init__(self, text_key, class_token_key, text_encoder_config, fusion_module_config, *args, **kwargs):
+    def __init__(self, text_key, text_encoder_config, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.text_encoder = instantiate_from_config(text_encoder_config)
-        self.fusion_module = instantiate_from_config(fusion_module_config)
         self.text_key = text_key
-        self.class_token_key = class_token_key
     
     def get_input(self, batch, k, bs=None, *args, **kwargs):
         ref_image = batch[self.cond_stage_key]
         B, N, H, W, C = ref_image.shape
-        batch[self.cond_stage_key] = ref_image.flatten(0, 1)
         x, cond = super().get_input(batch, k, bs, *args, **kwargs)
-        # cond['c_crossattn'].shape: (b, 257, 1024)
-        subject_embedding = cond['c_crossattn'][0][:, 0, ...]
-        subject_embedding = subject_embedding.reshape(B, N, -1)
+        # cond['c_crossattn'].shape: (b, n * 257, 1024)
         caption = batch[self.text_key]
-        class_token_ids = batch[self.class_token_key]
-        caption_embedding = self.text_encoder.encode(caption).to(subject_embedding)
-        
-        batch_ids = torch.arange(B)[..., None].repeat(1, N)
-        class_token_embedding = caption_embedding[batch_ids, class_token_ids]
-        fuse_token_embedding = torch.cat([subject_embedding, 
-                                          class_token_embedding], dim=-1)
-        fuse_token_embedding = self.fusion_module(fuse_token_embedding)
-        caption_embedding[batch_ids, class_token_ids] = fuse_token_embedding.to(caption_embedding)
-        cond['c_crossattn'] = [caption_embedding]
+        caption_embedding = self.text_encoder.encode(caption)
+        cond['caption'] = [caption_embedding]
         return x, cond
     
     @torch.no_grad()
@@ -219,7 +189,7 @@ class MultiDoorV2(ControlLDM):
         subject_embedding = cond['c_crossattn'][0]
         # subject_embedding.shape: (B, N, 1024)
         subject_embedding = subject_embedding.reshape(B, N, -1)
-        caption = batch[self.text_key]  # list of str
+        caption = batch[self.text_key]  # list[str]
         # (B, N)
         class_token_ids = batch[self.class_token_key]
         # (B, 77, 1024)
@@ -316,7 +286,7 @@ class MultiDoorV2(ControlLDM):
     def get_unconditional_conditioning(self, N, batch):
         uncond = {}
         uncond['subject'] = torch.zeros((N, 2, 1024))
-        uncond['text'] = batch['caption'][:N]
+        uncond['caption'] = batch['caption'][:N]
         uncond['class_token_ids'] = batch['class_token_ids'][:N]
         uncond = self.get_uncond(uncond)
         return uncond
@@ -324,12 +294,12 @@ class MultiDoorV2(ControlLDM):
     def get_uncond(self, uncond):
         # c.shape: (N, 2, 1024) 
         c = uncond['subject'].to('cuda')
-        txt = uncond['text']
+        caption = uncond['caption']
         class_token_ids = uncond['class_token_ids']
         N = c.shape[0]
         if self.text_encoder is not None:
             # uncond_txt: (N, 77, 1024)
-            uncond_txt = self.text_encoder(txt).last_hidden_state
+            uncond_txt = self.text_encoder(caption).last_hidden_state
             
             batch_ids = torch.arange(N)[..., None].repeat(1, 2)
             class_token_embedding = uncond_txt[batch_ids, class_token_ids]

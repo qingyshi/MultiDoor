@@ -43,6 +43,30 @@ class ControlledUnetModel(UNetModel):
         h = h.type(x.dtype)
         return self.out(h)
 
+class MultiControlledUnetModel(UNetModel):
+    def forward(self, x, timesteps=None, subject=None, caption=None, control=None, only_mid_control=False, **kwargs):
+        hs = []
+        with torch.no_grad():
+            t_emb = timestep_embedding(timesteps, self.model_channels, repeat_only=False)
+            emb = self.time_embed(t_emb)
+            h = x.type(self.dtype)
+            for module in self.input_blocks:
+                h = module(h, emb, subject, caption)
+                hs.append(h)
+            h = self.middle_block(h, emb, subject, caption)
+
+        if control is not None:
+            h += control.pop()
+
+        for i, module in enumerate(self.output_blocks):
+            if only_mid_control or control is None:
+                h = torch.cat([h, hs.pop()], dim=1)
+            else:
+                h = torch.cat([h, hs.pop() + control.pop()], dim=1)
+            h = module(h, emb, subject, caption)
+
+        h = h.type(x.dtype)
+        return self.out(h)
 
 class ControlNet(nn.Module):
     def __init__(
@@ -282,9 +306,9 @@ class ControlNet(nn.Module):
 
     def forward(self, x, hint, timesteps, context, **kwargs):
         t_emb = timestep_embedding(timesteps, self.model_channels, repeat_only=False)
-        emb = self.time_embed(t_emb) # 1,1280
+        emb = self.time_embed(t_emb) # 1, 1280
         
-        # 1,320,64,64
+        # 1, 320, 64, 64
         guided_hint = self.input_hint_block(hint, emb, context)
         outs = []
 

@@ -85,9 +85,9 @@ def process_pairs(ref_image, ref_mask, tar_image, tar_mask):
     # crop
     tar_box_yyxx_crop =  expand_bbox(tar_image, tar_box_yyxx, ratio=[1.5, 3])    #1.2 1.6
     tar_box_yyxx_crop = box2squre(tar_image, tar_box_yyxx_crop) # crop box
-    y1,y2,x1,x2 = tar_box_yyxx_crop
+    y1, y2, x1, x2 = tar_box_yyxx_crop
 
-    cropped_target_image = tar_image[y1:y2,x1:x2,:]
+    cropped_target_image = tar_image[y1:y2, x1:x2, :]
     tar_box_yyxx = box_in_box(tar_box_yyxx, tar_box_yyxx_crop)
     y1,y2,x1,x2 = tar_box_yyxx
 
@@ -110,7 +110,7 @@ def process_pairs(ref_image, ref_mask, tar_image, tar_mask):
 
     # the size after pad
     H2, W2 = collage.shape[0], collage.shape[1]
-    cropped_target_image = cv2.resize(cropped_target_image, (512,512)).astype(np.float32)
+    cropped_target_image = cv2.resize(cropped_target_image, (512, 512)).astype(np.float32)
     collage = cv2.resize(collage, (512,512)).astype(np.float32)
     collage_mask  = (cv2.resize(collage_mask, (512,512)).astype(np.float32) > 0.5).astype(np.float32)
 

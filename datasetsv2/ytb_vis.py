@@ -23,16 +23,16 @@ class YoutubeVISDataset(BaseDataset):
         
         with open(caption) as f:
             caption = json.load(f)
-
+            
+        self.caption = caption   
         self.records = records
-        self.caption = caption
         self.data = video_dirs
         self.size = (512,512)
         self.clip_size = (224,224)
         self.dynamic = 1
 
     def __len__(self):
-        return 40000
+        return len(self.data)
 
     def check_region_size(self, image, yyxx, ratio, mode = 'max'):
         pass_flag = True
@@ -47,24 +47,28 @@ class YoutubeVISDataset(BaseDataset):
             if h < H and w < W:
                 pass_flag = False
         return pass_flag
-
+    
     def get_sample(self, idx):
         video_id = list(self.records.keys())[idx]
         if video_id not in self.caption:
             raise Exception
         else:
-            caption_ann = self.caption[video_id]
-            caption = caption_ann['caption']
-            class_token_ids = caption_ann['class_token_ids']
+            caption = self.caption[video_id]
+            caption = caption['caption']
         
-        # obj_list = list(self.records[video_id]["objects"].keys())
-        # if len(obj_list) <= 1:
-        #     raise Exception
-        # objects_id = np.random.choice(obj_list, 2, replace=False)
-        objects_ids = caption_ann['obj_ids']
+        obj_list = list(self.records[video_id]["objects"].keys())
+        
+        if len(obj_list) == 0:
+            raise Exception
+        elif len(obj_list) == 1:
+            objects_ids = np.array(obj_list)
+        else:
+            objects_ids = np.random.choice(obj_list, 2, replace=False)
+            
+        # objects_ids = caption_ann['obj_ids']
         frames = [self.records[video_id]["objects"][str(single_id)]["frames"] for single_id in objects_ids]
-        names = [self.records[video_id]["objects"][str(single_id)]["category"] for single_id in objects_ids]
-        frames = np.intersect1d(*frames)
+        # names = [self.records[video_id]["objects"][str(single_id)]["category"] for single_id in objects_ids]
+        frames = np.intersect1d(*frames) if len(frames) == 2 else np.array(frames[0])
 
         # Sampling frames
         min_interval = len(frames) // 10
@@ -89,21 +93,19 @@ class YoutubeVISDataset(BaseDataset):
 
         ref_mask = Image.open(ref_mask_path).convert('P')
         ref_mask= np.array(ref_mask)
-        ref_mask = np.stack([ref_mask == int(single_id) for single_id in objects_ids], 0)
+        ref_mask = [ref_mask == int(single_id) for single_id in objects_ids]
 
         tar_mask = Image.open(tar_mask_path).convert('P')
         tar_mask= np.array(tar_mask)
-        tar_mask = np.stack([tar_mask == int(single_id) for single_id in objects_ids], 0)
+        tar_mask = [tar_mask == int(single_id) for single_id in objects_ids]
 
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()
         
         item_with_collage['time_steps'] = sampled_time_steps
-        # item_with_collage['names'] = names
         # item_with_collage['obj_ids'] = objects_ids
         # item_with_collage['img_path'] = tar_image_path
         # item_with_collage['video_id'] = video_id
         item_with_collage['caption'] = caption
-        item_with_collage['class_token_ids'] = torch.tensor(class_token_ids)
         return item_with_collage
 

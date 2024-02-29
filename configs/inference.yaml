@@ -1,3 +1,3 @@
-pretrained_model: path/epoch=1-step=8687.ckpt
-config_file: configs/anydoor.yaml
+pretrained_model: checkpoints/epoch=8.ckpt
+config_file: configs/multidoorv2.yaml
 save_memory: False
