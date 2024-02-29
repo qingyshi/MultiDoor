@@ -149,4 +149,5 @@ cache_dir/
 .vscode/
 .demo
 .data
-.examples/
+examples
+text.py
