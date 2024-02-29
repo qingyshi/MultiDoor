@@ -150,4 +150,4 @@ cache_dir/
 .demo
 .data
 examples
-text.py
+test.py
