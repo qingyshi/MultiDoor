@@ -247,6 +247,42 @@ class MemoryEfficientCrossAttention(nn.Module):
         return self.to_out(out)
 
 
+
+class GatedSelfAttentionDense(nn.Module):
+    ATTENTION_MODES = {
+        "softmax": CrossAttention,  # vanilla attention
+        "softmax-xformers": MemoryEfficientCrossAttention
+    }
+    def __init__(self, query_dim, context_dim,  n_heads, d_head, dropout=0., efficient_attention=False):
+        super().__init__()
+        # we need a linear projection since we need cat visual feature and obj feature
+        self.linear = nn.Linear(context_dim, query_dim)
+        attn_mode = "softmax-xformers" if XFORMERS_IS_AVAILBLE else "softmax"
+        assert attn_mode in self.ATTENTION_MODES
+        attn_cls = self.ATTENTION_MODES[attn_mode]
+        self.attn1 = attn_cls(query_dim=query_dim, heads=n_heads, dim_head=d_head, dropout=dropout,
+                              context_dim=context_dim if self.disable_self_attn else None)  # is a self-attention if not self.disable_self_attn
+        self.ff = FeedForward(query_dim, glu=True)
+
+        self.norm1 = nn.LayerNorm(query_dim)
+        self.norm2 = nn.LayerNorm(query_dim)
+
+        self.register_parameter('alpha_attn', nn.Parameter(torch.tensor(0.)) )
+        self.register_parameter('alpha_dense', nn.Parameter(torch.tensor(0.)) )
+
+        # this can be useful: we can externally change magnitude of tanh(alpha)
+        # for example, when it is set to 0, then the entire model is same as original one 
+        self.scale = 1  
+
+    def forward(self, x, subjects, grounding_input=None, drop_box_mask=False):
+        N_visual = x.shape[1]
+        objs = self.linear(subjects)
+        attention_output = self.attn(self.norm1(torch.cat([x, objs], dim=1)))
+        x = x + self.scale*torch.tanh(self.alpha_attn) * attention_output[:, 0:N_visual, :]
+        x = x + self.scale*torch.tanh(self.alpha_dense) * self.ff(self.norm2(x))  
+        return x 
+
+
 class BasicTransformerBlock(nn.Module):
     ATTENTION_MODES = {
         "softmax": CrossAttention,  # vanilla attention
@@ -268,13 +304,16 @@ class BasicTransformerBlock(nn.Module):
         self.norm2 = nn.LayerNorm(dim)
         self.norm3 = nn.LayerNorm(dim)
         self.checkpoint = checkpoint
+        
+        self.fuser = None
 
     def forward(self, x, context=None):
         return checkpoint(self._forward, (x, context), self.parameters(), self.checkpoint)
 
-    def _forward(self, x, context=None):
-        x = self.attn1(self.norm1(x), context=context if self.disable_self_attn else None) + x
-        x = self.attn2(self.norm2(x), context=context) + x
+    def _forward(self, x, subject=None, caption=None):
+        x = self.attn1(self.norm1(x), context=caption if self.disable_self_attn else None) + x
+        x = self.fuser(x)
+        x = self.attn2(self.norm2(x), context=caption) + x
         x = self.ff(self.norm3(x)) + x
         return x
 
@@ -322,10 +361,13 @@ class SpatialTransformer(nn.Module):
             self.proj_out = zero_module(nn.Linear(in_channels, inner_dim))
         self.use_linear = use_linear
 
-    def forward(self, x, context=None):
+    def forward(self, x, subject=None, caption=None):
         # note: if no context is given, cross-attention defaults to self-attention
-        if not isinstance(context, list):
-            context = [context]
+        if not isinstance(subject, list):
+            subject = [subject]
+        if not isinstance(caption, list):
+            caption = [caption]    
+        
         b, c, h, w = x.shape
         x_in = x
         x = self.norm(x)
@@ -335,7 +377,7 @@ class SpatialTransformer(nn.Module):
         if self.use_linear:
             x = self.proj_in(x)
         for i, block in enumerate(self.transformer_blocks):
-            x = block(x, context=context[i])
+            x = block(x, subject=subject[i], caption=caption[i])
         if self.use_linear:
             x = self.proj_out(x)
         x = rearrange(x, 'b (h w) c -> b c h w', h=h, w=w).contiguous()
