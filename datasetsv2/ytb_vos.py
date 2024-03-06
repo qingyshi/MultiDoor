@@ -32,14 +32,7 @@ class YoutubeVOSDataset(BaseDataset):
         self.dynamic = 1
 
     def __len__(self):
-        return len(self.data)
-    
-    # def __getitem__(self, idx):
-    #     try:
-    #         item = self.get_sample(idx)
-    #         return item
-    #     except:
-    #         idx = np.random.randint(0, len(self.data))
+        return 40000
 
     def check_region_size(self, image, yyxx, ratio, mode = 'max'):
         pass_flag = True
@@ -57,12 +50,7 @@ class YoutubeVOSDataset(BaseDataset):
 
     def get_sample(self, idx):
         video_id = list(self.records.keys())[idx]
-
-        if video_id not in self.caption:
-            raise Exception
-        else:
-            caption_ann = self.caption[video_id]
-            caption = caption_ann['caption']
+        caption = self.load_caption(video_id)
         
         objects = list(self.records[video_id]["objects"].keys())
         if len(objects) >= 2:
@@ -109,10 +97,10 @@ class YoutubeVOSDataset(BaseDataset):
         sampled_time_steps = self.sample_timestep()
         
         item_with_collage['time_steps'] = sampled_time_steps
-        item_with_collage['obj_ids'] = objects_ids
+        # item_with_collage['obj_ids'] = objects_ids
         item_with_collage['img_path'] = tar_image_path
-        item_with_collage['video_id'] = video_id
-        # item_with_collage['caption'] = caption
+        # item_with_collage['video_id'] = video_id
+        item_with_collage['caption'] = caption
 
         return item_with_collage
 

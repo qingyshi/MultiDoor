@@ -23,14 +23,7 @@ class MVImageNetDataset(BaseDataset):
         self.dynamic = 2
 
     def __len__(self):
-        return len(self.data)
-
-    # def __getitem__(self, idx):
-    #     try:
-    #         item = self.get_sample(idx)
-    #         return item
-    #     except:
-    #         pass
+        return 10000
     
     def check_region_size(self, image, yyxx, ratio, mode = 'max'):
         pass_flag = True
@@ -54,8 +47,7 @@ class MVImageNetDataset(BaseDataset):
     def get_sample(self, idx):
         object_dir = self.data[idx].replace('./', self.image_dir)
         _object_dir = os.path.dirname(object_dir)
-        if _object_dir in self.caption:
-            caption = self.caption[_object_dir]['caption']
+        caption = self.load_caption(_object_dir)
         
         frames = os.listdir(object_dir)
         frames = [i for i in frames if '.png' in i]
@@ -88,11 +80,11 @@ class MVImageNetDataset(BaseDataset):
         ref_mask = self.get_alpha_mask(ref_mask_path)
         tar_mask = self.get_alpha_mask(tar_mask_path)
 
-        item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask, mkdata=True)
+        item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()
         item_with_collage['time_steps'] = sampled_time_steps
         item_with_collage['caption'] = caption
-        # item_with_collage['img_path'] = tar_image_path
+        item_with_collage['img_path'] = tar_image_path
         # item_with_collage['video_id'] = os.path.dirname(object_dir)
 
         return item_with_collage

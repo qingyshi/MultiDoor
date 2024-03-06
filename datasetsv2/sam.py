@@ -29,21 +29,13 @@ class SAMDataset(BaseDataset):
         data = os.listdir(path)
         data = [ os.path.join(path, i) for i in data if '.json' in i]
         self.data = self.data + data
-
-    # def __getitem__(self, idx):
-    #     try:
-    #         item = self.get_sample(idx)
-    #         return item
-    #     except:
-    #         idx = np.random.randint(0, len(self.data)-1)
     
     def get_sample(self, idx):
         # ==== get pairs =====
         json_path = self.data[idx]
         image_path = json_path.replace('.json', '.jpg')
         image_id = os.path.basename(image_path)
-        if image_id in self.caption:
-            caption = self.caption['image_id']['caption']
+        caption = self.load_caption(image_id)
 
         with open(json_path, 'r') as json_file:
             data = json.load(json_file)
@@ -74,12 +66,12 @@ class SAMDataset(BaseDataset):
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()
         item_with_collage['time_steps'] = sampled_time_steps
-        # item_with_collage['img_path'] = image_path
+        item_with_collage['img_path'] = image_path
         item_with_collage['caption'] = caption
         return item_with_collage
 
     def __len__(self):
-        return len(self.data)
+        return 20000
 
     def check_region_size(self, image, yyxx, ratio, mode = 'max'):
         pass_flag = True

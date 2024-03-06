@@ -133,21 +133,21 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         for param in self.parameters():
             param.requires_grad = False
 
-    def forward(self, text):
+    def forward(self, text, layer="last"):
         batch_encoding = self.tokenizer(text, truncation=True, max_length=self.max_length, return_length=True,
                                         return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
         tokens = batch_encoding["input_ids"].to(self.device)
         outputs = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")
-        if self.layer == "last":
+        if layer == "last":
             z = outputs.last_hidden_state
-        elif self.layer == "pooled":
+        elif layer == "pooled":
             z = outputs.pooler_output[:, None, :]
         else:
             z = outputs.hidden_states[self.layer_idx]
         return z
 
-    def encode(self, text):
-        return self(text)
+    def encode(self, text, layer="last"):
+        return self(text, layer)
 
 
 class FrozenOpenCLIPEmbedder(AbstractEncoder):
@@ -293,6 +293,7 @@ class FrozenDinoV2Encoder(AbstractEncoder):
         self.image_mean = torch.tensor([0.485, 0.456, 0.406]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
         self.image_std =  torch.tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)        
         self.projector = nn.Linear(1536, 1024)
+        self.null_token = nn.Parameter(torch.zeros([1024], requires_grad=True))
 
     def freeze(self):
         self.model.eval()
@@ -300,21 +301,22 @@ class FrozenDinoV2Encoder(AbstractEncoder):
             param.requires_grad = False
 
     def forward(self, image):
-        if isinstance(image,list):
-            image = torch.cat(image, 0)
         if len(image.shape) == 5:
-            b, n, c, h, w = image.shape
-            image = rearrange(image, 'b n c h w -> (b n) c h w')
+            b, n, h, w, c = image.shape
+            image = rearrange(image, 'b n h w c -> (b n) c h w').to(torch.float16)
 
         image = (image.to(self.device)  - self.image_mean.to(self.device)) / self.image_std.to(self.device)
         features = self.model.forward_features(image)
-        tokens = features["x_norm_patchtokens"]
+        # tokens = features["x_norm_patchtokens"]
         image_features  = features["x_norm_clstoken"]
-        image_features = image_features.unsqueeze(1)
-        hint = torch.cat([image_features, tokens], 1)  
-        hint = self.projector(hint)     # (b * n, 257, 1024)
-        hint = hint.reshape(b, n, 257, 1024).flatten(1, 2)
-        return hint
+        image_features = image_features.reshape(b, n, -1)
+        hint = self.projector(image_features) # (b, n, 1024)
+        ref_token = self.null_token[None].repeat(b, 30, 1)
+        ref_token[:, :n, :] = hint
+        # hint = torch.cat([image_features, tokens], 1)
+        # hint = self.projector(hint) # (b * n, 257, 1024)
+        # hint = hint.reshape(b, n, 257, 1024).flatten(1, 2)
+        return ref_token
 
     def encode(self, image):
         return self(image)

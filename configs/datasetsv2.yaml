@@ -3,25 +3,26 @@ Train:
     image_dir: /data00/youtube_vos_2019/train/JPEGImages/
     anno: /data00/youtube_vos_2019/train/Annotations/
     meta: /data00/youtube_vos_2019/train/meta.json
-    caption: /data00/sqy/
+    caption: ./data/caption_ytvos.json
 
   YoutubeVIS:
     image_dir: /data00/datasets/youtube_vis_2019/train/JPEGImages/
     anno: /data00/datasets/youtube_vis_2019/train/Annotations/
     meta: /data00/datasets/youtube_vis_2019/train/meta.json
-    caption: /data00/sqy/
+    caption: ./data/caption_ytvis.json
 
   VIPSeg:
     image_dir: /data00/VIPSeg/VIPSeg_720P/images/
     anno: /data00/VIPSeg/VIPSeg_720P/panomasksRGB/
     meta: /data00/VIPSeg/VIPSeg_720P/panoptic_gt_VIPSeg.json
-    caption: /data00/sqy/
+    caption: ./data/caption_vipseg.json
 
   UVO:
     train:
       image_dir: /data00/UVO/uvo_frames_sparse
       video_json: /data00/UVO/VideoSparseSet/UVO_sparse_train_video_with_interpolation.json
       image_json: /data00/UVO/VideoSparseSet/UVO_sparse_train_video_with_interpolation_reorg.json
+      caption: ./data/caption_uvo.json
     val:
       image_dir: path/UVO/uvo_frames_sparse
       video_json: path/UVO/VideoSparseSet/UVO_sparse_val_video_with_interpolation.json
@@ -30,10 +31,12 @@ Train:
   Mose:
     image_dir: /data00/MOSE/train/JPEGImages/
     anno: /data00/MOSE/train/Annotations/
+    caption: ./data/caption_mose.json
 
   MVImageNet:
     txt: /data00/MVImgNet/mvimagenet.txt
     image_dir: /data00/MVImgNet/
+    caption: ./data/caption_mvimagenet.json
 
   VitonHD:
     image_dir: /data00/VitonHD/train/cloth/
@@ -47,13 +50,14 @@ Train:
   Lvis:
     image_dir: /data00/datasets/coco/train2017
     json_path: /data00/LVIS/lvis_v1_train.json
-    caption_path: /data00/sqy/caption_lvis_good.json
+    caption: ./data/caption_coco.json
 
   SAM:
     sub1: /data00/sam/0000
     sub2: /data00/sam/0001
     sub3: /data00/sam/0002
     sub4: /data00/sam/0004
+    caption: ./data/caption_sam.json
 
   Saliency:
     MSRA_root: path/Saliency/MSRA10K_Imgs_GT/
@@ -64,7 +68,7 @@ Train:
   COCO:
     root: /data00/datasets/coco/train2017
     annotation: /data00/datasets/coco/annotations/instances_train2017.json
-    # caption: /data00/sqy/caption_coco_good.json
+    caption: ./data/caption_coco.json
 
 Test:
   DreamBooth:

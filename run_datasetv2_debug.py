@@ -56,10 +56,9 @@ def vis_sample(item):
     vis = cv2.hconcat([ref.astype(np.float32), hint_image.astype(np.float32), hint_mask.astype(np.float32), tar.astype(np.float32)])
     cv2.imwrite('sample_vis.jpg', vis[:, :, ::-1])
     print(item['caption'][0])
-    print(item['class_token_ids'][0])
 
 
-dataloader = DataLoader(dataset, num_workers=8, batch_size=2, shuffle=True)
+dataloader = DataLoader(dataset, num_workers=8, batch_size=1, shuffle=True)
 print('len dataloader: ', len(dataloader))
 for data in dataloader:
     vis_sample(data) 

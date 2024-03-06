@@ -20,13 +20,6 @@ class CocoDataset(BaseDataset):
         self.transforms = transforms
         self.cat_to_names = {cat_id: cat['name'] for cat_id, cat in self.coco.cats.items()}
         self.dynamic = 0
-
-    # def __getitem__(self, idx):
-    #     try:
-    #         item = self.get_sample(idx)
-    #         return item
-    #     except:
-    #         idx = np.random.randint(0, len(self.data))
     
     def get_sample(self, index):
         coco = self.coco
@@ -83,4 +76,4 @@ class CocoDataset(BaseDataset):
         return item_with_collage
 
     def __len__(self):
-        return len(self.data)
+        return 40000

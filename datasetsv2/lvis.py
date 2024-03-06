@@ -11,7 +11,7 @@ from pycocotools import mask as mask_utils
 from lvis import LVIS
 
 class LvisDataset(BaseDataset):
-    def __init__(self, image_dir, json_path, caption_path):
+    def __init__(self, image_dir, json_path, caption):
         self.image_dir = image_dir
         self.json_path = json_path
         lvis_api = LVIS(json_path)
@@ -20,7 +20,7 @@ class LvisDataset(BaseDataset):
         anns = [lvis_api.img_ann_map[img_id] for img_id in img_ids]
         self.data = imgs
         self.annos = anns
-        self.caption = json.load(open(caption_path, 'r'))
+        self.caption = json.load(open(caption, 'r'))
         self.lvis_api = lvis_api
         self.size = (512,512)
         self.clip_size = (224,224)
@@ -34,12 +34,7 @@ class LvisDataset(BaseDataset):
     def get_sample(self, idx):
         # ==== get pairs =====
         image_name = self.data[idx]['coco_url'].split('/')[-1]
-        if image_name not in self.caption:
-            raise Exception
-        else:
-            caption_ann = self.caption[image_name]
-            caption = caption_ann['caption']
-            class_token_ids = caption_ann['class_token_ids']
+        caption = self.load_caption(image_name)
             
         image_path = os.path.join(self.image_dir, image_name)
         image = cv2.imread(image_path)
@@ -69,12 +64,12 @@ class LvisDataset(BaseDataset):
         sampled_time_steps = self.sample_timestep()
         item_with_collage['time_steps'] = sampled_time_steps
         item_with_collage['img_path'] = image_path
-        # item_with_collage['caption'] = caption
+        item_with_collage['caption'] = caption
         # item_with_collage['class_token_ids'] = torch.tensor(class_token_ids)
         return item_with_collage
 
     def __len__(self):
-        return 2000
+        return 10000
 
     def check_region_size(self, image, yyxx, ratio, mode = 'max'):
         pass_flag = True

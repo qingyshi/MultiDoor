@@ -228,7 +228,7 @@ class ControlNet(nn.Module):
                             ) if not use_spatial_transformer else SpatialTransformer(
                                 ch, num_heads, dim_head, depth=transformer_depth, context_dim=context_dim,
                                 disable_self_attn=disabled_sa, use_linear=use_linear_in_transformer,
-                                use_checkpoint=use_checkpoint
+                                use_checkpoint=use_checkpoint, is_controlnet=True
                             )
                         )
                 self.input_blocks.append(TimestepEmbedSequential(*layers))
@@ -287,7 +287,7 @@ class ControlNet(nn.Module):
             ) if not use_spatial_transformer else SpatialTransformer(  # always uses a self-attn
                 ch, num_heads, dim_head, depth=transformer_depth, context_dim=context_dim,
                 disable_self_attn=disable_middle_self_attn, use_linear=use_linear_in_transformer,
-                use_checkpoint=use_checkpoint
+                use_checkpoint=use_checkpoint, is_controlnet=True
             ),
             ResBlock(
                 ch,
@@ -319,11 +319,11 @@ class ControlNet(nn.Module):
                 h = guided_hint
                 guided_hint = None
             else:
-                h_new = module(h, emb, context) 
+                h_new = module(h, emb, caption=context) 
                 h =  h_new 
             outs.append(zero_conv(h, emb, context))
 
-        h_new = self.middle_block(h, emb, context)  
+        h_new = self.middle_block(h, emb, caption=context)  
         outs.append(self.middle_block_out(h_new, emb, context))        
         return outs
 

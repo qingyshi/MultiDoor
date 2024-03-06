@@ -7,9 +7,9 @@ model:
     log_every_t: 200
     timesteps: 1000
     first_stage_key: "jpg"
-    cond_stage_key: "ref"
+    cond_stage_key: "caption"
     control_key: "hint"
-    text_key: "caption"
+    ref_key: "ref"
     image_size: 64
     channels: 4
     cond_stage_trainable: false
@@ -38,7 +38,7 @@ model:
         legacy: False
 
     unet_config:
-      target: cldm.cldm.ControlledUnetModel
+      target: cldm.cldm.MultiControlledUnetModel
       params:
         use_checkpoint: True
         image_size: 32 # unused
@@ -79,11 +79,11 @@ model:
         lossconfig:
           target: torch.nn.Identity
 
-    cond_stage_config:
+    subject_stage_config:
       target: ldm.modules.encoders.modules.FrozenDinoV2Encoder
       weight: checkpoints/dinov2_vitg14_pretrain.pth
     
-    text_encoder_config:
-      target: cldm.multidoor.FrozenTextEmbedder
+    cond_stage_config:
+      target: ldm.modules.encoders.modules.FrozenCLIPEmbedder
       params:
-        version: "checkpoints/stable-diffusion-2-1-base"
+        version: "/data00/sqy/checkpoints/laion/CLIP-ViT-H-14-laion2B-s32B-b79K"

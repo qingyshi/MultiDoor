@@ -5,73 +5,50 @@ import torch
 from torch import nn
 from einops import rearrange, repeat
 from torchvision.utils import make_grid
-from diffusers import StableDiffusionPipeline
-
-
-class FrozenTextEmbedder(AbstractEncoder):
-    """Uses the CLIP transformer encoder for text (from huggingface)"""
-    LAYERS = [
-        "last",
-        "pooled",
-        "hidden"
-    ]
-    def __init__(self, version="stabilityai/stable-diffusion-2-1", device="cuda", max_length=77,
-                 freeze=True, layer="last", layer_idx=None):  # clip-vit-base-patch32
-        super().__init__()
-        assert layer in self.LAYERS
-        pipe = StableDiffusionPipeline.from_pretrained(version, torch_dtype=torch.float32)
-        self.tokenizer = pipe.tokenizer
-        self.transformer = pipe.text_encoder
-        del pipe
-        self.device = device
-        self.max_length = max_length
-        if freeze:
-            self.freeze()
-        self.layer = layer
-        self.layer_idx = layer_idx
-        if layer == "hidden":
-            assert layer_idx is not None
-            assert 0 <= abs(layer_idx) <= 12
-
-    def freeze(self):
-        self.transformer = self.transformer.eval()
-        #self.train = disabled_train
-        for param in self.parameters():
-            param.requires_grad = False
-
-    def forward(self, text):
-        batch_encoding = self.tokenizer(text, truncation=True, max_length=self.max_length, return_length=True,
-                                        return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
-        tokens = batch_encoding["input_ids"].to(self.device)
-        outputs = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")
-        if self.layer == "last":
-            z = outputs.last_hidden_state
-        elif self.layer == "pooled":
-            z = outputs.pooler_output[:, None, :]
-        else:
-            z = outputs.hidden_states[self.layer_idx]
-        return z
-
-    def encode(self, text):
-        return self(text)
-        
+from diffusers import StableDiffusionPipeline        
         
 
 class MultiDoor(ControlLDM):
-    def __init__(self, text_key, text_encoder_config, *args, **kwargs):
+    def __init__(self, ref_key, subject_stage_config, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.text_encoder = instantiate_from_config(text_encoder_config)
-        self.text_key = text_key
+        self.ref_encoder = instantiate_from_config(subject_stage_config)
+        self.ref_key = ref_key
     
     def get_input(self, batch, k, bs=None, *args, **kwargs):
-        ref_image = batch[self.cond_stage_key]
-        B, N, H, W, C = ref_image.shape
         x, cond = super().get_input(batch, k, bs, *args, **kwargs)
-        # cond['c_crossattn'].shape: (b, n * 257, 1024)
-        caption = batch[self.text_key]
-        caption_embedding = self.text_encoder.encode(caption)
-        cond['caption'] = [caption_embedding]
+        # cond['c_crossattn'].shape: (b, 77, 1024)
+        ref_image = batch[self.ref_key] # ref_image.shape: (b, n, 224, 224, 3)
+        ref_token = self.ref_encoder(ref_image)
+        cond['ref_token'] = [ref_token]
         return x, cond
+    
+    def apply_model(self, x_noisy, t, cond, *args, **kwargs):
+        assert isinstance(cond, dict)
+        diffusion_model = self.model.diffusion_model
+
+        cond_text = torch.cat(cond['c_crossattn'], dim=1)
+        cond_subject = torch.cat(cond['ref_token'], dim=1)
+
+        if cond['c_concat'] is None:
+            eps = diffusion_model(x=x_noisy, timesteps=t, subject=cond_subject, caption=cond_text, control=None, only_mid_control=self.only_mid_control)
+        else:
+            control = self.control_model(x=x_noisy, hint=torch.cat(cond['c_concat'], 1), timesteps=t, context=cond_text)
+            control = [c * scale for c, scale in zip(control, self.control_scales)]
+            eps = diffusion_model(x=x_noisy, timesteps=t, subject=cond_subject, caption=cond_text, control=control, only_mid_control=self.only_mid_control)
+        return eps
+    
+    def configure_optimizers(self):
+        lr = self.learning_rate
+        params = list(self.control_model.parameters())
+        params += list(self.model.diffusion_model.out.parameters())
+        params += list(self.ref_encoder.projector.parameters())
+        params.append(self.ref_encoder.null_token)
+        for name, param in self.named_parameters():
+            if 'transformer_blocks' in name and 'fuser' in name:
+                params.append(param)
+        
+        opt = torch.optim.AdamW(params, lr=lr)
+        return opt
     
     @torch.no_grad()
     def log_images(self, batch, N=4, n_row=2, sample=False, ddim_steps=50, ddim_eta=0.0, return_keys=None,
@@ -83,7 +60,7 @@ class MultiDoor(ControlLDM):
 
         log = dict()
         z, c = self.get_input(batch, self.first_stage_key, bs=N)
-        c_cat, c = c["c_concat"][0][:N], c["c_crossattn"][0][:N]
+        c_cat, c, ref = c["c_concat"][0][:N], c["c_crossattn"][0][:N], c['ref_token'][0][:N]
         N = min(z.shape[0], N)
         n_row = min(z.shape[0], n_row)
         log["reconstruction"] = self.decode_first_stage(z) 
@@ -95,8 +72,7 @@ class MultiDoor(ControlLDM):
 
         log["control"] = HF_map
 
-        cond_image = batch[self.cond_stage_key].cpu().numpy().copy()    # (2 * b, 224, 224, 3)
-        cond_image = torch.from_numpy(cond_image).reshape(-1, 2, 224, 224, 3)[:N]
+        cond_image = batch[self.ref_key][:N].clone()    # (b, 2, 224, 224, 3)
         cond_image = torch.cat([cond_image[:, i, ...] for i in range(cond_image.shape[1])], dim=2)
         log["conditioning"] = torch.permute(cond_image, (0, 3, 1, 2)) * 2.0 - 1.0  
         if plot_diffusion_rows:
@@ -119,7 +95,7 @@ class MultiDoor(ControlLDM):
 
         if sample:
             # get denoise row
-            samples, z_denoise_row = self.sample_log(cond={"c_concat": [c_cat], "c_crossattn": [c]},
+            samples, z_denoise_row = self.sample_log(cond={"c_concat": [c_cat], "c_crossattn": [c], "ref_token": [ref]},
                                                      batch_size=N, ddim=use_ddim,
                                                      ddim_steps=ddim_steps, eta=ddim_eta)
             x_samples = self.decode_first_stage(samples)
@@ -131,8 +107,8 @@ class MultiDoor(ControlLDM):
         if unconditional_guidance_scale > 1.0:
             uc_cross = self.get_unconditional_conditioning(N, batch)
             uc_cat = c_cat  # torch.zeros_like(c_cat)
-            uc_full = {"c_concat": [uc_cat], "c_crossattn": [uc_cross]}
-            samples_cfg, _ = self.sample_log(cond={"c_concat": [c_cat], "c_crossattn": [c]},
+            uc_full = {"c_concat": [uc_cat], "c_crossattn": [uc_cross], "ref_token": [ref]}
+            samples_cfg, _ = self.sample_log(cond={"c_concat": [c_cat], "c_crossattn": [c], "ref_token": [ref]},
                                              batch_size=N, ddim=use_ddim,
                                              ddim_steps=ddim_steps, eta=ddim_eta,
                                              unconditional_guidance_scale=unconditional_guidance_scale,
@@ -144,34 +120,10 @@ class MultiDoor(ControlLDM):
     
     @torch.no_grad()
     def get_unconditional_conditioning(self, N, batch):
-        uncond = {}
-        uncond['subject'] = torch.zeros((N, 2, 1024))
-        uncond['text'] = batch['caption'][:N]
-        uncond['class_token_ids'] = batch['class_token_ids'][:N]
-        uncond = self.get_uncond(uncond)
+        uncond = [" "] * N
+        uncond = self.cond_stage_model(uncond)  # (N, 77, 1024)
         return uncond
-    
-    def get_uncond(self, uncond):
-        # c.shape: (N, 2, 1024) 
-        c = uncond['subject'].to('cuda')
-        txt = uncond['text']
-        class_token_ids = uncond['class_token_ids']
-        N = c.shape[0]
-        if self.text_encoder is not None:
-            # uncond_txt: (N, 77, 1024)
-            uncond_txt = self.text_encoder.encode(txt)
-            
-            batch_ids = torch.arange(N)[..., None].repeat(1, 2)
-            class_token_embedding = uncond_txt[batch_ids, class_token_ids]
-            fuse_token_embedding = torch.cat([c, class_token_embedding], dim=-1)
-            fuse_token_embedding = self.fusion_module(fuse_token_embedding).detach()
-            fuse_token_embedding.requires_grad_(False)
-            uncond_txt[batch_ids, class_token_ids] = fuse_token_embedding
-        else:
-            uncond_txt = torch.zeros((N, 77, 1024))
-        
-        uncond = uncond_txt
-        return uncond
+
     
 class MultiDoorV2(ControlLDM):
     def __init__(self, text_key, class_token_key, text_encoder_config, fusion_module_config, *args, **kwargs):

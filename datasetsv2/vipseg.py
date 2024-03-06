@@ -21,10 +21,10 @@ class VIPSegDataset(BaseDataset):
         self.clip_size = (224,224)
         self.dynamic = 1
         
-        # with open(caption, 'r') as file:
-        #     caption = json.load(file)
+        with open(caption, 'r') as file:
+            caption = json.load(file)
             
-        # self.caption = caption
+        self.caption = caption
         # with open(meta, 'r') as file:
         #     ann = json.load(file)
         
@@ -39,7 +39,7 @@ class VIPSegDataset(BaseDataset):
         #     self.id2is_thing[cat['id']] = cat['isthing']
 
     def __len__(self):
-        return len(self.data)
+        return 40000
 
     def check_region_size(self, image, yyxx, ratio, mode = 'max'):
         pass_flag = True
@@ -58,11 +58,7 @@ class VIPSegDataset(BaseDataset):
     def get_sample(self, idx):
         video_name = self.data[idx]
         
-        if video_name not in self.caption:
-            raise Exception
-        else:
-            caption_ann = self.caption[video_name]
-            caption = caption_ann['caption']
+        caption = self.load_caption(video_name)
             
         # ann_per_frame = self.vid_name2ann_per_frame[video_name]     # list
         video_path = os.path.join(self.image_root, video_name)
@@ -127,7 +123,7 @@ class VIPSegDataset(BaseDataset):
         
         item_with_collage['time_steps'] = sampled_time_steps
         # item_with_collage['video_id'] = video_name
-        # item_with_collage['img_path'] = tar_image_path
+        item_with_collage['img_path'] = tar_image_path
         item_with_collage['caption'] = caption
         return item_with_collage
 
