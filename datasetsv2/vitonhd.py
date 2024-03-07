@@ -57,7 +57,7 @@ class VitonHDDataset(BaseDataset):
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask, max_ratio = 1.0)
         sampled_time_steps = self.sample_timestep()
         item_with_collage['time_steps'] = sampled_time_steps
-        item_with_collage['caption'] = 'The person in this picture is dressing a bueatiful cloth.'
+        item_with_collage['caption'] = 'The person in this picture is dressing a cloth.'
         item_with_collage['img_path'] = tar_image_path
         return item_with_collage
 
