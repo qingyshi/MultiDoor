@@ -13,6 +13,7 @@ from datasetsv2.vitonhd import VitonHDDataset
 from datasetsv2.fashiontryon import FashionTryonDataset
 from datasetsv2.lvis import LvisDataset
 from datasetsv2.coco import CocoDataset
+from datasetsv2.hico import HICODataset
 from cldm.logger import ImageLogger
 from cldm.model import create_model, load_state_dict
 from torch.utils.data import ConcatDataset
@@ -26,7 +27,7 @@ if save_memory:
     enable_sliced_attention()
 
 # Configs
-resume_path = 'checkpoints/epoch=8.ckpt'
+resume_path = 'checkpoints/control_sd21_ini.ckpt'
 batch_size = 4
 logger_freq = 2000
 learning_rate = 1e-5
@@ -34,7 +35,7 @@ sd_locked = False
 only_mid_control = False
 n_gpus = 4
 accumulate_grad_batches = 1
-max_epochs = 3
+max_epochs = 12
 
 # First use cpu to load models. Pytorch Lightning will automatically move it to GPUs.
 model = create_model('./configs/multidoor.yaml').cpu()
@@ -58,8 +59,9 @@ dataset10 = MoseDataset(**DConf.Train.Mose)
 # dataset11 = FashionTryonDataset(**DConf.Train.FashionTryon)
 dataset12 = LvisDataset(**DConf.Train.Lvis)
 dataset13 = CocoDataset(**DConf.Train.COCO)
+dataset14 = HICODataset(**DConf.Train.HICO)
 
-image_data = [dataset6, dataset8, dataset12, dataset13]
+image_data = [dataset6, dataset8, dataset12, dataset13, dataset14]
 video_data = [dataset1, dataset3, dataset4, dataset7, dataset10]
 
 # The ratio of each dataset is adjusted by setting the __len__ 

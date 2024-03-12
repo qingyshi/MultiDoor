@@ -15,7 +15,7 @@ from share import *
 from cldm.model import create_model
 
 
-# python tool_add_control_sd21.py checkpoints/stable-diffusion-2-1-base/v2-1_512-ema-pruned.ckpt checkpoints/control_sd21_ini.ckpt
+# python tool_add_control_sd21.py /data00/sqy/checkpoints/stable-diffusion-2-1-base/v2-1_512-ema-pruned.ckpt checkpoints/control_sd21_ini.ckpt
 
 def get_node_name(name, parent_name):
     if len(name) <= len(parent_name):

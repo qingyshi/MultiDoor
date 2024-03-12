@@ -63,7 +63,7 @@ def process_pairs(ref_image, ref_mask, tar_image, tar_mask):
 
     # to square and resize
     masked_ref_image = pad_to_square(masked_ref_image, pad_value = 255, random = False)
-    masked_ref_image = cv2.resize(masked_ref_image, (224,224) ).astype(np.uint8)
+    masked_ref_image = cv2.resize(masked_ref_image, (224, 224) ).astype(np.uint8)
 
     ref_mask_3 = pad_to_square(ref_mask_3 * 255, pad_value = 0, random = False)
     ref_mask_3 = cv2.resize(ref_mask_3, (224,224) ).astype(np.uint8)

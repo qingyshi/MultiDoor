@@ -293,7 +293,7 @@ class FrozenDinoV2Encoder(AbstractEncoder):
         self.image_mean = torch.tensor([0.485, 0.456, 0.406]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
         self.image_std =  torch.tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)        
         self.projector = nn.Linear(1536, 1024)
-        self.null_token = nn.Parameter(torch.zeros([1024], requires_grad=True))
+        self.sub_obj_emb = torch.nn.Parameter(torch.randn(2, 1024))
 
     def freeze(self):
         self.model.eval()
@@ -301,22 +301,28 @@ class FrozenDinoV2Encoder(AbstractEncoder):
             param.requires_grad = False
 
     def forward(self, image):
+        """
+        Input:
+            image: multiple reference objects from single image in shape (b, n, h, w, c)
+        Output:
+            ref_token: reference tokens in shape (b, n, 256, 1024)
+        """
+        
         if len(image.shape) == 5:
             b, n, h, w, c = image.shape
             image = rearrange(image, 'b n h w c -> (b n) c h w').to(torch.float16)
 
         image = (image.to(self.device)  - self.image_mean.to(self.device)) / self.image_std.to(self.device)
         features = self.model.forward_features(image)
-        # tokens = features["x_norm_patchtokens"]
-        image_features  = features["x_norm_clstoken"]
-        image_features = image_features.reshape(b, n, -1)
-        hint = self.projector(image_features) # (b, n, 1024)
-        ref_token = self.null_token[None].repeat(b, 30, 1)
-        ref_token[:, :n, :] = hint
-        # hint = torch.cat([image_features, tokens], 1)
-        # hint = self.projector(hint) # (b * n, 257, 1024)
-        # hint = hint.reshape(b, n, 257, 1024).flatten(1, 2)
-        return ref_token
+        patchtokens = features["x_norm_patchtokens"]
+        clstoken  = features["x_norm_clstoken"]
+        patchtokens = patchtokens.reshape(b, n, 256, -1)
+        clstoken = clstoken.reshape(b, n, 1, -1)
+        image_features = clstoken + patchtokens # (b, n, 256, 1536)
+        hint = self.projector(image_features) # (b, n, 256, 1024)
+        emb = self.sub_obj_emb.view(1, 2, 1, 1024)
+        hint = hint + emb
+        return hint.flatten(1, 2)
 
     def encode(self, image):
         return self(image)

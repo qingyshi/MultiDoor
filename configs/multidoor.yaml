@@ -8,8 +8,8 @@ model:
     timesteps: 1000
     first_stage_key: "jpg"
     cond_stage_key: "caption"
+    ref_img_key: "ref"
     control_key: "hint"
-    ref_key: "ref"
     image_size: 64
     channels: 4
     cond_stage_trainable: false
@@ -79,7 +79,7 @@ model:
         lossconfig:
           target: torch.nn.Identity
 
-    subject_stage_config:
+    img_cond_config:
       target: ldm.modules.encoders.modules.FrozenDinoV2Encoder
       weight: checkpoints/dinov2_vitg14_pretrain.pth
     

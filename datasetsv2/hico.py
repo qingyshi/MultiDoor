@@ -23,7 +23,7 @@ class HICODataset(BaseDataset):
         self.dynamic = 0
     
     def __len__(self):
-        return len(self.data)
+        return 40000
     
     def get_sample(self, index):
         filename = self.data[index]

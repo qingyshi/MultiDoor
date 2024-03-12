@@ -15,6 +15,7 @@ import albumentations as A
 from omegaconf import OmegaConf
 from PIL import Image
 import os
+from datasetsv2.coco import CocoDataset
 
 
 save_memory = False
@@ -22,9 +23,11 @@ disable_verbosity()
 if save_memory:
     enable_sliced_attention()
 
+DConf = OmegaConf.load('./configs/datasetsv2.yaml')
+dataset = CocoDataset(**DConf.Train.COCO)
 
 config = OmegaConf.load('./configs/inference.yaml')
-model_ckpt = config.pretrained_model
+model_ckpt =  config.pretrained_model
 model_config = config.config_file
 
 model: MultiDoor = create_model(model_config).cpu()
@@ -247,10 +250,8 @@ def process_multi_pairs(ref_image, ref_mask, tar_image, tar_mask):
     tar_box_yyxx = (y1, y2, x1, x2)
     
     # bbox which contains multi-subjects
-    y1 = min([bbox[0] for bbox in multi_subject_bbox_crop])
-    x1 = min([bbox[2] for bbox in multi_subject_bbox_crop])
-    y2 = max([bbox[1] for bbox in multi_subject_bbox_crop])
-    x2 = max([bbox[3] for bbox in multi_subject_bbox_crop])
+    y1, x1 = min([[bbox[0], bbox[2]] for bbox in multi_subject_bbox_crop])
+    y2, x2 = max([[bbox[1], bbox[3]] for bbox in multi_subject_bbox_crop])
     tar_box_yyxx_crop = (y1, y2, x1, x2)
     cropped_target_image = tar_image[y1: y2, x1: x2, :]
     collage = cropped_target_image.copy()
@@ -297,29 +298,32 @@ def process_multi_pairs(ref_image, ref_mask, tar_image, tar_mask):
 
 def crop_back(pred, tar_image, extra_sizes, tar_box_yyxx_crop):
     H1, W1, H2, W2 = extra_sizes
-    y1, y2, x1, x2 = tar_box_yyxx_crop    
-    pred = cv2.resize(pred, (W2, H2))
+    y1, y2, x1, x2 = tar_box_yyxx_crop
+    h, w, _ = tar_image.shape
+    y2 = min(h, y2)
+    x2 = min(w, x2) 
+    pred = cv2.resize(pred, (x2 - x1, y2 - y1))
     m = 5 # maigin_pixel
 
-    if W1 == H1:
-        tar_image[y1+m: y2-m, x1+m: x2-m, :] = pred[m:-m, m:-m]
-        return tar_image
+    # if W1 == H1:
+    #     tar_image[y1+m: y2-m, x1+m: x2-m, :] = pred[m:-m, m:-m]
+    #     return tar_image
 
-    if W1 < W2:
-        pad1 = int((W2 - W1) / 2)
-        pad2 = W2 - W1 - pad1
-        pred = pred[:,pad1: -pad2, :]
-    else:
-        pad1 = int((H2 - H1) / 2)
-        pad2 = H2 - H1 - pad1
-        pred = pred[pad1: -pad2, :, :]
+    # if W1 < W2:
+    #     pad1 = int((W2 - W1) / 2)
+    #     pad2 = W2 - W1 - pad1
+    #     pred = pred[:,pad1: -pad2, :]
+    # else:
+    #     pad1 = int((H2 - H1) / 2)
+    #     pad2 = H2 - H1 - pad1
+    #     pred = pred[pad1: -pad2, :, :]
 
     gen_image = tar_image.copy()
     gen_image[y1+m: y2-m, x1+m: x2-m, :] =  pred[m:-m, m:-m]
     return gen_image
 
 
-def inference_single_image(ref_image, ref_mask, tar_image, tar_mask, caption, guidance_scale = 5.0):
+def inference_single_image(item, guidance_scale = 5.0):
     '''
     inputs:
         ref_image.shape: (H, W, 3) or [(H1, W1, 3), (H2, W2, 3)]
@@ -327,21 +331,17 @@ def inference_single_image(ref_image, ref_mask, tar_image, tar_mask, caption, gu
         tar_image.shape: (H, W, 3)
         tar_mask.shape: [(H, W), (H, W)]
     '''
-    if isinstance(ref_image, list):
-        item = process_multi_pairs(ref_image, ref_mask, tar_image, tar_mask)
-    else:
-        item = process_pairs(ref_image, ref_mask, tar_image, tar_mask)
 
     ref = item['ref']
     tar = item['jpg'] 
     hint = item['hint']
+    caption = item['caption']
     num_samples = 1
 
     control = torch.from_numpy(hint.copy()).float().cuda() 
     control = torch.stack([control for _ in range(num_samples)], dim=0)
     control = einops.rearrange(control, 'b h w c -> b c h w').clone()
 
-    # clip_input.shape: (n, 224, 224, 3)
     dino_input = torch.from_numpy(ref.copy()).float().cuda() 
     dino_input = torch.stack([dino_input for _ in range(num_samples)], dim=0)
     dino_input = dino_input.clone().to('cuda')
@@ -391,57 +391,32 @@ def inference_single_image(ref_image, ref_mask, tar_image, tar_mask, caption, gu
     pred = np.clip(pred, 0, 255)[1:, :, :]
     sizes = item['extra_sizes']
     tar_box_yyxx_crop = item['tar_box_yyxx_crop'] 
-    gen_image = crop_back(pred, tar_image, sizes, tar_box_yyxx_crop) 
-    return gen_image, hint
+    gen_image = crop_back(pred, tar, sizes, tar_box_yyxx_crop) 
+    return gen_image
 
 
 if __name__ == '__main__': 
-    # ==== Example for inferring a single image ===
-    name = 'ride'
-    reference_image_path = ['examples/' + name + '/ref1.jpg', 'examples/' + name + '/ref2.jpg'] if os.path.exists('examples/' + name + '/ref1.jpg') else 'examples/' + name + '/ref.jpg'
-    reference_mask_path = ['examples/' + name + '/0.png', 'examples/' + name + '/1.png']
-    bg_image_path = 'examples/' + name + '/scene.jpg'
-    bg_mask_path = ['examples/' + name + '/tar01.png', 'examples/' + name + '/tar02.png']
-    # bg_image_path = 'examples/TestDreamBooth/BG/000000047948_GT.png'
-    # bg_mask_path = ['examples/TestDreamBooth/BG/000000047948_mask.png', 'examples/TestDreamBooth/BG/000000309203_mask.png']
-    save_path = 'examples/' + name + '/gen_res.png'
-    caption = ['A woman is riding a horse with a grass land behind her']
-
-    # reference image + reference mask
-    # You could use the demo of SAM to extract RGB-A image with masks
-    # https://segment-anything.com/demo
-    if isinstance(reference_image_path, list):
-        image = [cv2.cvtColor(cv2.imread(ref_image_path), cv2.COLOR_BGR2RGB) for ref_image_path in reference_image_path]
-    else:
-        image = cv2.cvtColor(cv2.imread(reference_image_path), cv2.COLOR_BGR2RGB)
-    mask = [np.array(Image.open(file).convert('L')) == 255 for file in reference_mask_path]
-    ref_image = image 
-    ref_mask = mask
-
-    # background image
-    back_image = cv2.imread(bg_image_path).astype(np.uint8)
-    back_image = cv2.cvtColor(back_image, cv2.COLOR_BGR2RGB)
-
-    # background mask 
-    tar_mask = [np.array(Image.open(file).convert('L')) == 255 for file in bg_mask_path]
-    tar_mask = np.stack(tar_mask, axis=0).astype(np.uint8)
-    
-    gen_image, hint = inference_single_image(ref_image, ref_mask, back_image.copy(), tar_mask, caption)
-    h, w = back_image.shape[0], back_image.shape[1]
-    hint = cv2.resize(hint, (w, h))
-    hint = hint[:, :, :-1] * 127.5 + 127.5
-    hint = hint.astype(np.uint8)
-    if isinstance(ref_image, list):
-        ref_image = [cv2.resize(ref, (w, h)) for ref in ref_image]
-        vis_image = cv2.hconcat([ref_image[0], ref_image[1], back_image, hint, gen_image])
-    else:
-        ref_image = cv2.resize(ref_image, (w, h))
-        tar_mask = [cv2.resize(tar_m, (w, h)) for tar_m in tar_mask]
-        vis_image = cv2.hconcat([ref_image, back_image, hint, gen_image])
-    
-    cv2.imwrite(save_path, vis_image [:, :, ::-1])
-    # cv2.imwrite(save_path, gen_image)
-    print('finish!')
+    count = 0
+    while True:
+        save_path = f'examples/train/visual{count}.jpg'
+        data = next(iter(dataset))
+        back_image = data['jpg'] * 127.5 + 127.5
+        ref_image = data['ref'] * 127.5 + 127.5
+        collage = data['hint'] * 127.5 + 127.5
+        gen_image = inference_single_image(item=data)
+        h, w = back_image.shape[0], back_image.shape[1]
+        if len(ref_image) == 2:
+            ref_image = [cv2.resize(ref, (w, h)) for ref in ref_image]
+            collage = cv2.resize(collage, (w, h))
+            vis_image = cv2.hconcat([ref_image[0].astype(np.float32), ref_image[1].astype(np.float32), collage[:, :, :-1].astype(np.float32), back_image, gen_image])
+        else:
+            ref_image = cv2.resize(ref_image, (w, h))
+            vis_image = cv2.hconcat([ref_image, back_image, gen_image])
+        
+        cv2.imwrite(save_path, vis_image[:, :, ::-1])
+        print(data['caption'])
+        print('finish!')
+        count += 1
     #'''
     #'''
     # ==== Example for inferring VITON-HD Test dataset ===

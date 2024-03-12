@@ -248,38 +248,29 @@ class MemoryEfficientCrossAttention(nn.Module):
 
 
 
-class GatedSelfAttentionDense(nn.Module):
+class GatedCrossAttention(nn.Module):
     ATTENTION_MODES = {
         "softmax": CrossAttention,  # vanilla attention
         "softmax-xformers": MemoryEfficientCrossAttention
     }
-    def __init__(self, query_dim, sub_dim,  n_heads, d_head, dropout=0., efficient_attention=False):
+    def __init__(self, query_dim, sub_dim,  n_heads, d_head, dropout=0.):
         super().__init__()
-        # we need a linear projection since we need cat visual feature and obj feature
-        self.linear = nn.Linear(sub_dim, query_dim)
         attn_mode = "softmax-xformers" if XFORMERS_IS_AVAILBLE else "softmax"
         assert attn_mode in self.ATTENTION_MODES
         attn_cls = self.ATTENTION_MODES[attn_mode]
-        self.attn1 = attn_cls(query_dim=query_dim, heads=n_heads, dim_head=d_head, dropout=dropout,
-                              context_dim=None)
-        self.ff = FeedForward(query_dim, glu=True)
-
+        self.attn1 = attn_cls(query_dim=query_dim, context_dim=sub_dim, 
+                              heads=n_heads, dim_head=d_head, dropout=dropout)
         self.norm1 = nn.LayerNorm(query_dim)
-        self.norm2 = nn.LayerNorm(query_dim)
 
         self.register_parameter('alpha_attn', nn.Parameter(torch.tensor(0.)) )
-        self.register_parameter('alpha_dense', nn.Parameter(torch.tensor(0.)) )
 
         # this can be useful: we can externally change magnitude of tanh(alpha)
         # for example, when it is set to 0, then the entire model is same as original one 
         self.scale = 1  
 
-    def forward(self, x, subjects, grounding_input=None, drop_box_mask=False):
-        N_visual = x.shape[1]
-        objs = self.linear(subjects)
-        attention_output = self.attn1(self.norm1(torch.cat([x, objs], dim=1)))
-        x = x + self.scale * torch.tanh(self.alpha_attn) * attention_output[:, 0:N_visual, :]
-        x = x + self.scale * torch.tanh(self.alpha_dense) * self.ff(self.norm2(x))  
+    def forward(self, x, subjects):
+        attention_output = self.attn1(self.norm1(x), subjects)
+        x = x + self.scale * torch.tanh(self.alpha_attn) * attention_output
         return x 
 
 
@@ -300,16 +291,17 @@ class BasicTransformerBlock(nn.Module):
         self.ff = FeedForward(dim, dropout=dropout, glu=gated_ff)
         self.attn2 = attn_cls(query_dim=dim, context_dim=context_dim,
                               heads=n_heads, dim_head=d_head, dropout=dropout)  # is self-attn if context is none
+
         self.norm1 = nn.LayerNorm(dim)
         self.norm2 = nn.LayerNorm(dim)
         self.norm3 = nn.LayerNorm(dim)
         self.checkpoint = checkpoint
         
         if not is_controlnet:
-            self.fuser = GatedSelfAttentionDense(query_dim=dim, sub_dim=context_dim, 
-                                                 n_heads=n_heads, d_head=d_head)
+            self.fuser = GatedCrossAttention(query_dim=dim, sub_dim=context_dim,
+                                    n_heads=n_heads, d_head=d_head, dropout=dropout)  # is self-attn if context is none
 
-    def forward(self, x, subject=None, caption=None):
+    def forward(self, x, caption=None, subject=None):
         if subject is None:
             return checkpoint(self._forward, (x, caption), self.parameters(), self.checkpoint)
         return checkpoint(self._forward, (x, caption, subject), self.parameters(), self.checkpoint)
@@ -366,7 +358,7 @@ class SpatialTransformer(nn.Module):
             self.proj_out = zero_module(nn.Linear(in_channels, inner_dim))
         self.use_linear = use_linear
 
-    def forward(self, x, subject=None, caption=None):
+    def forward(self, x, caption=None, subject=None):
         # note: if no context is given, cross-attention defaults to self-attention
         if not isinstance(subject, list):
             subject = [subject]
@@ -382,7 +374,7 @@ class SpatialTransformer(nn.Module):
         if self.use_linear:
             x = self.proj_in(x)
         for i, block in enumerate(self.transformer_blocks):
-            x = block(x, subject=subject[i], caption=caption[i])
+            x = block(x, caption=caption[i], subject=subject[i])
         if self.use_linear:
             x = self.proj_out(x)
         x = rearrange(x, 'b (h w) c -> b c h w', h=h, w=w).contiguous()

@@ -76,12 +76,12 @@ class TimestepEmbedSequential(nn.Sequential, TimestepBlock):
     support it as an extra input.
     """
 
-    def forward(self, x, emb, subject=None, caption=None):
+    def forward(self, x, emb, caption=None, subject=None):
         for layer in self:
             if isinstance(layer, TimestepBlock):
                 x = layer(x, emb)
             elif isinstance(layer, SpatialTransformer):
-                x = layer(x, subject, caption)
+                x = layer(x, caption, subject)
             else:
                 x = layer(x)
         return x
@@ -312,7 +312,7 @@ class AttentionBlock(nn.Module):
 
     def forward(self, x):
         return checkpoint(self._forward, (x,), self.parameters(), True)   # TODO: check checkpoint usage, is True # TODO: fix the .half call!!!
-        #return pt_checkpoint(self._forward, x)  # pytorch
+        # return pt_checkpoint(self._forward, x)  # pytorch
 
     def _forward(self, x):
         b, c, *spatial = x.shape

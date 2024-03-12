@@ -195,8 +195,10 @@ class BaseDataset(Dataset):
             multi_subject_bbox_crop.append(tar_box_yyxx_crop)
         
         # Bbox which contains multi-subjects
-        y1, x1 = min([[bbox[0], bbox[2]] for bbox in multi_subject_bbox_crop])
-        y2, x2 = max([[bbox[1], bbox[3]] for bbox in multi_subject_bbox_crop])
+        y1 = min([bbox[0] for bbox in multi_subject_bbox_crop])
+        x1 = min([bbox[2] for bbox in multi_subject_bbox_crop])
+        y2 = max([bbox[1] for bbox in multi_subject_bbox_crop])
+        x2 = max([bbox[3] for bbox in multi_subject_bbox_crop])
         tar_box_yyxx_crop = (y1, y2, x1, x2)
         cropped_target_image = tar_image[y1: y2, x1: x2, :]
         collage = cropped_target_image.copy()
