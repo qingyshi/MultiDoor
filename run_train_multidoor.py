@@ -26,14 +26,15 @@ if save_memory:
     enable_sliced_attention()
 
 # Configs
-resume_path = 'checkpoints/control_sd21_ini.ckpt'
+resume_path = 'checkpoints/epoch=8.ckpt'
 batch_size = 4
-logger_freq = 1000
+logger_freq = 2000
 learning_rate = 1e-5
 sd_locked = False
 only_mid_control = False
 n_gpus = 4
 accumulate_grad_batches = 1
+max_epochs = 3
 
 # First use cpu to load models. Pytorch Lightning will automatically move it to GPUs.
 model = create_model('./configs/multidoor.yaml').cpu()
@@ -81,7 +82,7 @@ trainer = pl.Trainer(
     callbacks=[logger, checkpoint_callback],
     progress_bar_refresh_rate=1,
     accumulate_grad_batches=accumulate_grad_batches,
-    max_epochs=12
+    max_epochs=max_epochs
 )
 
 

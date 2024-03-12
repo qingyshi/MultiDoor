@@ -70,6 +70,13 @@ Train:
     annotation: /data00/datasets/coco/annotations/instances_train2017.json
     caption: ./data/caption_coco.json
 
+  HICO:
+    root: /data00/hico_20160224_det
+    image_dir: images/train2015
+    mask_dir: relationships
+    annotation: instances_train2015.json
+
+
 Test:
   DreamBooth:
     fg_dir: path/DreamBooth/AnyDoor_DreamBooth

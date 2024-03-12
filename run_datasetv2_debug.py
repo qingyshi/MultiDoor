@@ -12,6 +12,7 @@ from datasetsv2.vitonhd import VitonHDDataset
 from datasetsv2.fashiontryon import FashionTryonDataset
 from datasetsv2.lvis import LvisDataset
 from datasetsv2.coco import CocoDataset
+from datasetsv2.hico import HICODataset
 from torch.utils.data import ConcatDataset
 from torch.utils.data import DataLoader
 import numpy as np 
@@ -33,12 +34,13 @@ DConf = OmegaConf.load('./configs/datasetsv2.yaml')
 # # dataset10 = MoseDataset(**DConf.Train.Mose)
 # # dataset11 = FashionTryonDataset(**DConf.Train.FashionTryon)
 # dataset12 = LvisDataset(**DConf.Train.Lvis)
-dataset13 = CocoDataset(**DConf.Train.COCO)
+# dataset13 = CocoDataset(**DConf.Train.COCO)
+dataset14 = HICODataset(**DConf.Train.HICO)
 
 # image_data = [dataset12]
 # video_data = [dataset1, dataset3, dataset4]
-# dataset = ConcatDataset( image_data + video_data + video_data)
-dataset = dataset13
+# dataset = ConcatDataset(image_data + video_data + video_data)
+dataset = dataset14
 
 def vis_sample(item):
     ref = torch.cat([item['ref'][:, i] for i in range(2)], dim=2) * 255
@@ -62,4 +64,4 @@ dataloader = DataLoader(dataset, num_workers=8, batch_size=1, shuffle=True)
 print('len dataloader: ', len(dataloader))
 for data in dataloader:
     vis_sample(data) 
-    break
+    # break

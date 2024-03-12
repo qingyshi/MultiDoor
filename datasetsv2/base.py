@@ -43,7 +43,7 @@ class BaseDataset(Dataset):
         return transformed_image, transformed_mask
 
 
-    def check_region_size(self, image, yyxx, ratio, mode = 'max'):
+    def check_region_size(self, image, yyxx, ratio, mode='max'):
         pass_flag = True
         H, W = image.shape[0], image.shape[1]
         H, W = H * ratio, W * ratio
@@ -132,8 +132,8 @@ class BaseDataset(Dataset):
             if isinstance(ref_mask, list):
                 ref_mask, tar_mask = ref_mask[0], tar_mask[0]
             item = self.process_single_pair(ref_image, ref_mask, tar_image, tar_mask)
-            null_ref = np.zeros_like(item['ref'])
-            item['ref'] = np.stack([item['ref'], null_ref], axis=0)
+            null_ref_image = np.zeros_like(item['ref'])
+            item['ref'] = np.stack([item['ref'], null_ref_image], axis=0)
             return item
         
         # Get the outline Box of the reference image
@@ -142,7 +142,7 @@ class BaseDataset(Dataset):
         
         for single_mask in ref_mask:
             ref_box_yyxx = get_bbox_from_mask(single_mask)
-            assert self.check_region_size(single_mask, ref_box_yyxx, ratio = 0.10, mode = 'min') == True
+            assert self.check_region_size(single_mask, ref_box_yyxx, ratio=0.10, mode='min') == True
         
             # Filtering background for the reference image
             ref_mask_3 = np.stack([single_mask, single_mask, single_mask], -1)
@@ -172,13 +172,12 @@ class BaseDataset(Dataset):
             multi_subject_ref_mask.append(ref_mask_compose)
 
         masked_ref_image_compose = np.stack(multi_subject_ref_image, axis=0)
-        masked_ref_image_aug = masked_ref_image_compose.copy()  # (2, 224, 244, 3)
+        masked_ref_image_aug = masked_ref_image_compose.copy() # as ref image, shape: (2, 224, 244, 3)
         # Getting for high-freqency map
-        multi_ref_image_collage = [sobel(masked_ref_image_compose, ref_mask_compose / 255) for 
-                                         masked_ref_image_compose, ref_mask_compose in 
-                                     zip(multi_subject_ref_image, multi_subject_ref_mask)]
+        multi_ref_image_collage = [sobel(masked_ref_image_compose, ref_mask_compose / 255) for masked_ref_image_compose, ref_mask_compose in 
+                                        zip(multi_subject_ref_image, multi_subject_ref_mask)]
 
-        
+
 
         # ========= Training Target ===========
         multi_subject_bbox = []
@@ -188,7 +187,7 @@ class BaseDataset(Dataset):
             tar_box_yyxx = get_bbox_from_mask(single_mask)
             tar_box_yyxx = expand_bbox(single_mask, tar_box_yyxx, ratio=[1.1, 1.2]) # 1.1, 1.3
             multi_subject_bbox.append(tar_box_yyxx)
-            # assert self.check_region_size(single_mask, tar_box_yyxx, ratio = max_ratio, mode = 'max') == True
+            # assert self.check_region_size(single_mask, tar_box_yyxx, ratio=max_ratio, mode='max') == True
             
             # Cropping around the target object 
             tar_box_yyxx_crop = expand_bbox(tar_image, tar_box_yyxx, ratio=[1.3, 3.0])   
