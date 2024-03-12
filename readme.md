@@ -46,10 +46,10 @@ pip install lvis
 
 ### Download checkpoints
 
-Download DINOv2 checkpoint and revise `/configs/multidoor.yaml` for the path (line 84).
+Download DINOv2 checkpoint and revise `./configs/multidoor.yaml` for the path (line 84).
 * URL: https://github.com/facebookresearch/dinov2?tab=readme-ov-file
 
-Download CLIP-ViT-H-14 and revise '/configs/multidoor.yaml' for the path (line 89).
+Download CLIP-ViT-H-14 and revise `./configs/multidoor.yaml` for the path (line 89).
 * URL: https://huggingface.co/laion/CLIP-ViT-H-14-laion2B-s32B-b79K/tree/main
 
 Download Stable Diffusion V2.1 base for training from scratch.
@@ -61,11 +61,11 @@ If your would like to train from scratch, convert the downloaded checkpoints to 
 ```bash
 sh ./scripts/convert_weight.sh  
 ```
-There will be a checkpoint at "./checkpoints/control_sd21_ini.ckpt"
+There will be a checkpoint at `./checkpoints/control_sd21_ini.ckpt`
 
 ### Prepare the datasets
 
-* download datasets and revise '/configs/datasetsv2.yaml' for the path
+* download datasets and revise `./configs/datasetsv2.yaml` for the path
 * You could prepare you own datasets according to the formates of files in `./datasetsv2`.
 * If you use UVO dataset, you need to process the json following `./datasetsv2/Preprocess/uvo_process.py`
 * You could refer to `run_datasetv2_debug.py` to verify you data is correct.
