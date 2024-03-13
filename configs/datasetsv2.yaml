@@ -1,8 +1,8 @@
 Train:
   YoutubeVOS:
-    image_dir: /data00/youtube_vos_2019/train/JPEGImages/
-    anno: /data00/youtube_vos_2019/train/Annotations/
-    meta: /data00/youtube_vos_2019/train/meta.json
+    image_dir: /data00/multidoor_dataset/youtube_vos_2019/train/JPEGImages/
+    anno: /data00/multidoor_dataset/youtube_vos_2019/train/Annotations/
+    meta: /data00/multidoor_dataset/youtube_vos_2019/train/meta.json
     caption: ./data/caption_ytvos.json
 
   YoutubeVIS:
@@ -12,16 +12,16 @@ Train:
     caption: ./data/caption_ytvis.json
 
   VIPSeg:
-    image_dir: /data00/VIPSeg/VIPSeg_720P/images/
-    anno: /data00/VIPSeg/VIPSeg_720P/panomasksRGB/
-    meta: /data00/VIPSeg/VIPSeg_720P/panoptic_gt_VIPSeg.json
+    image_dir: /data00/multidoor_dataset/VIPSeg/VIPSeg_720P/images/
+    anno: /data00/multidoor_dataset/VIPSeg/VIPSeg_720P/panomasksRGB/
+    meta: /data00/multidoor_dataset/VIPSeg/VIPSeg_720P/panoptic_gt_VIPSeg.json
     caption: ./data/caption_vipseg.json
 
   UVO:
     train:
-      image_dir: /data00/UVO/uvo_frames_sparse
-      video_json: /data00/UVO/VideoSparseSet/UVO_sparse_train_video_with_interpolation.json
-      image_json: /data00/UVO/VideoSparseSet/UVO_sparse_train_video_with_interpolation_reorg.json
+      image_dir: /data00/multidoor_dataset/UVO/uvo_frames_sparse
+      video_json: /data00/multidoor_dataset/UVO/VideoSparseSet/UVO_sparse_train_video_with_interpolation.json
+      image_json: /data00/multidoor_dataset/UVO/VideoSparseSet/UVO_sparse_train_video_with_interpolation_reorg.json
       caption: ./data/caption_uvo.json
     val:
       image_dir: path/UVO/uvo_frames_sparse
@@ -29,41 +29,41 @@ Train:
       image_json: path/UVO/VideoSparseSet/UVO_sparse_val_video_interpolation_reorg.json
 
   Mose:
-    image_dir: /data00/MOSE/train/JPEGImages/
-    anno: /data00/MOSE/train/Annotations/
+    image_dir: /data00/multidoor_dataset/MOSE/train/JPEGImages/
+    anno: /data00/multidoor_dataset/MOSE/train/Annotations/
     caption: ./data/caption_mose.json
 
   MVImageNet:
-    txt: /data00/MVImgNet/mvimagenet.txt
-    image_dir: /data00/MVImgNet/
+    txt: /data00/multidoor_dataset/MVImgNet/mvimagenet.txt
+    image_dir: /data00/multidoor_dataset/MVImgNet/
     caption: ./data/caption_mvimagenet.json
 
   VitonHD:
-    image_dir: /data00/VitonHD/train/cloth/
+    image_dir: /data00/multidoor_dataset/VitonHD/train/cloth/
 
   Dresscode:
     image_dir: /mnt/workspace/xizhi/data/dresscode/DressCode/upper_body/label_maps/
 
   FashionTryon:
-    image_dir: /data00/FashionTryOn/train
+    image_dir: /data00/multidoor_dataset/FashionTryOn/train
 
   Lvis:
     image_dir: /data00/datasets/coco/train2017
-    json_path: /data00/LVIS/lvis_v1_train.json
+    json_path: /data00/multidoor_dataset/LVIS/lvis_v1_train.json
     caption: ./data/caption_coco.json
 
   SAM:
-    sub1: /data00/sam/0000
-    sub2: /data00/sam/0001
-    sub3: /data00/sam/0002
-    sub4: /data00/sam/0004
+    sub1: /data00/multidoor_dataset/sam/0000
+    sub2: /data00/multidoor_dataset/sam/0001
+    sub3: /data00/multidoor_dataset/sam/0002
+    sub4: /data00/multidoor_dataset/sam/0004
     caption: ./data/caption_sam.json
 
   Saliency:
     MSRA_root: path/Saliency/MSRA10K_Imgs_GT/
-    TR_root: /data00/DUT/DUTS-TR-Image/
-    TE_root: /data00/DUT/DUTS-TE-Image/
-    HFlickr_root: /data00/HFlickr/masks/
+    TR_root: /data00/multidoor_dataset/DUT/DUTS-TR-Image/
+    TE_root: /data00/multidoor_dataset/DUT/DUTS-TE-Image/
+    HFlickr_root: /data00/multidoor_dataset/HFlickr/masks/
   
   COCO:
     root: /data00/datasets/coco/train2017
@@ -71,7 +71,7 @@ Train:
     caption: ./data/caption_coco.json
 
   HICO:
-    root: /data00/hico_20160224_det
+    root: /data00/multidoor_dataset/hico
     image_dir: images/train2015
     mask_dir: relationships
     annotation: instances_train2015.json
@@ -83,7 +83,7 @@ Test:
     bg_dir: path/DreamBooth/v1_800
 
   VitonHDTest:
-    image_dir: /data00/VitonHD/test/cloth
+    image_dir: /data00/multidoor_dataset/VitonHD/test/cloth
 
 
 
