@@ -305,6 +305,9 @@ class FrozenDinoV2Encoder(AbstractEncoder):
         if len(image.shape) == 5:
             b, n, c, h, w = image.shape
             image = rearrange(image, 'b n c h w -> (b n) c h w')
+        else:
+            b, c, h, w = image.shape
+            n = 1
 
         image = (image.to(self.device)  - self.image_mean.to(self.device)) / self.image_std.to(self.device)
         features = self.model.forward_features(image)
