@@ -9,13 +9,14 @@ from pytorch_lightning.utilities.distributed import rank_zero_only
 
 
 class ImageLogger(Callback):
-    def __init__(self, batch_frequency=2000, max_images=4, clamp=True, increase_log_steps=True,
+    def __init__(self, batch_frequency=2000, max_images=4, split="train", clamp=True, increase_log_steps=True,
                  rescale=True, disabled=False, log_on_batch_idx=False, log_first_step=False,
                  log_images_kwargs=None):
         super().__init__()
         self.rescale = rescale
         self.batch_freq = batch_frequency
         self.max_images = max_images
+        self.split = split
         if not increase_log_steps:
             self.log_steps = [self.batch_freq]
         self.clamp = clamp
@@ -40,6 +41,7 @@ class ImageLogger(Callback):
             Image.fromarray(grid).save(path)
 
     def log_img(self, pl_module, batch, batch_idx, split="train"):
+        split = self.split if self.split is not None else "train"
         check_idx = batch_idx  # if self.log_on_batch_idx else pl_module.global_step
         if (self.check_frequency(check_idx) and  # batch_idx % self.batch_freq == 0
                 hasattr(pl_module, "log_images") and

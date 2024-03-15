@@ -21,7 +21,7 @@ import torch
 from omegaconf import OmegaConf
 
 # Datasets
-DConf = OmegaConf.load('./configs/datasetsv2.yaml')
+DConf = OmegaConf.load('./configs/datasets.yaml')
 # dataset1 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)  
 # # dataset2 = SaliencyDataset(**DConf.Train.Saliency) 
 # dataset3 = VIPSegDataset(**DConf.Train.VIPSeg) 

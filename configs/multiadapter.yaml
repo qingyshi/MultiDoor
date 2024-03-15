@@ -1,5 +1,5 @@
 model:
-  target: cldm.multidoor.MultiDoor
+  target: cldm.multiadapter.MultiAdapter
   params:
     linear_start: 0.00085
     linear_end: 0.0120
@@ -9,7 +9,6 @@ model:
     first_stage_key: "jpg"
     cond_stage_key: "caption"
     ref_img_key: "ref"
-    control_key: "hint"
     image_size: 64
     channels: 4
     cond_stage_trainable: false
@@ -18,24 +17,6 @@ model:
     scale_factor: 0.18215
     use_ema: False
     only_mid_control: False
-
-    control_stage_config:
-      target: cldm.cldm.ControlNet
-      params:
-        use_checkpoint: True
-        image_size: 32 # unused
-        in_channels: 4 
-        hint_channels: 4 #3
-        model_channels: 320
-        attention_resolutions: [ 4, 2, 1 ]
-        num_res_blocks: 2
-        channel_mult: [ 1, 2, 4, 4 ]
-        num_head_channels: 64 # need to fix for flash-attn
-        use_spatial_transformer: True
-        use_linear_in_transformer: True
-        transformer_depth: 1
-        context_dim: 1024
-        legacy: False
 
     unet_config:
       target: cldm.cldm.MultiControlledUnetModel
@@ -79,12 +60,12 @@ model:
           dropout: 0.0
         lossconfig:
           target: torch.nn.Identity
-
-    img_cond_config:
-      target: ldm.modules.encoders.modules.FrozenDinoV2Encoder
-      weight: checkpoints/dinov2_vitg14_pretrain.pth
     
     cond_stage_config:
-      target: ldm.modules.encoders.modules.FrozenCLIPEmbedder
+      target: ldm.modules.encoders.modules.FrozenOpenCLIPEmbedder
       params:
-        version: "/data00/sqy/checkpoints/laion/CLIP-ViT-H-14-laion2B-s32B-b79K"
+        version: /data00/sqy/checkpoints/laion/CLIP-ViT-H-14-laion2B-s32B-b79K/open_clip_pytorch_model.bin
+    
+    img_cond_config:
+      target: ldm.modules.encoders.modules.FrozenDinoV2Encoder
+      weight: /data00/sqy/checkpoints/dinov2/dinov2_vitg14_pretrain.pth

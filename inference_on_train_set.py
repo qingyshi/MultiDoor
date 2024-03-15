@@ -23,7 +23,7 @@ disable_verbosity()
 if save_memory:
     enable_sliced_attention()
 
-DConf = OmegaConf.load('./configs/datasetsv2.yaml')
+DConf = OmegaConf.load('./configs/datasets.yaml')
 dataset = CocoDataset(**DConf.Train.COCO)
 
 config = OmegaConf.load('./configs/inference.yaml')

@@ -11,7 +11,7 @@ from ldm.modules.diffusionmodules.util import (
 )
 from einops import rearrange, repeat
 from torchvision.utils import make_grid
-from ldm.modules.attention import SpatialTransformer
+from ldm.modules.attention import SpatialTransformer, BasicTransformerBlock
 from ldm.modules.diffusionmodules.openaimodel import UNetModel, TimestepEmbedSequential, ResBlock, Downsample, AttentionBlock
 from ldm.models.diffusion.ddpm import LatentDiffusion
 from ldm.util import log_txt_as_img, exists, instantiate_from_config
@@ -44,6 +44,12 @@ class ControlledUnetModel(UNetModel):
         return self.out(h)
 
 class MultiControlledUnetModel(UNetModel):
+    def __init__(self, is_adapter=False, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for m in self.modules():
+            if isinstance(m, BasicTransformerBlock):
+                m.ip_adapter = is_adapter
+        
     def forward(self, x, timesteps=None, caption=None, subject=None, control=None, only_mid_control=False, **kwargs):
         hs = []
         with torch.no_grad():

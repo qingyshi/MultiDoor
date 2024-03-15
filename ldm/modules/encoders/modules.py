@@ -273,9 +273,9 @@ sys.path.append("./dinov2")
 import hubconf
 from einops import rearrange
 from omegaconf import OmegaConf
-config_path = './configs/anydoor.yaml'
+config_path = './configs/multiadapter.yaml'
 config = OmegaConf.load(config_path)
-DINOv2_weight_path = config.model.params.cond_stage_config.weight
+DINOv2_weight_path = config.model.params.img_cond_config.weight
 
 class FrozenDinoV2Encoder(AbstractEncoder):
     """

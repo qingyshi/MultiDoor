@@ -270,8 +270,7 @@ class GatedCrossAttention(nn.Module):
 
     def forward(self, x, subjects):
         attention_output = self.attn1(self.norm1(x), subjects)
-        x = x + self.scale * torch.tanh(self.alpha_attn) * attention_output
-        return x 
+        return self.scale * torch.tanh(self.alpha_attn) * attention_output
 
 
 class BasicTransformerBlock(nn.Module):
@@ -280,7 +279,7 @@ class BasicTransformerBlock(nn.Module):
         "softmax-xformers": MemoryEfficientCrossAttention
     }
     def __init__(self, dim, n_heads, d_head, dropout=0., context_dim=None, gated_ff=True, checkpoint=True,
-                 disable_self_attn=False, is_controlnet=False):
+                 disable_self_attn=False, is_controlnet=False, ip_adapter=False):
         super().__init__()
         attn_mode = "softmax-xformers" if XFORMERS_IS_AVAILBLE else "softmax"
         assert attn_mode in self.ATTENTION_MODES
@@ -300,6 +299,7 @@ class BasicTransformerBlock(nn.Module):
         if not is_controlnet:
             self.fuser = GatedCrossAttention(query_dim=dim, sub_dim=context_dim,
                                     n_heads=n_heads, d_head=d_head, dropout=dropout)  # is self-attn if context is none
+        self.ip_adapter = ip_adapter
 
     def forward(self, x, caption=None, subject=None):
         if subject is None:
@@ -309,8 +309,15 @@ class BasicTransformerBlock(nn.Module):
     def _forward(self, x, caption=None, subject=None):
         x = self.attn1(self.norm1(x), context=caption if self.disable_self_attn else None) + x
         if subject is not None:
-            x = self.fuser(x, subject)
-        x = self.attn2(self.norm2(x), context=caption) + x
+            if self.ip_adapter:
+                x1 = self.fuser(x, subjects=subject)
+                x2 = self.attn2(self.norm2(x), context=caption) + x
+                x = x1 + x2
+            else:
+                x = self.fuser(x, subjects=subject) + x
+                x = self.attn2(self.norm2(x), context=caption) + x
+        else:
+            x = self.attn2(self.norm2(x), context=caption) + x
         x = self.ff(self.norm3(x)) + x
         return x
 
