@@ -82,9 +82,9 @@ model:
 
     img_cond_config:
       target: ldm.modules.encoders.modules.FrozenDinoV2Encoder
-      weight: checkpoints/dinov2_vitg14_pretrain.pth
+      weight: /data00/sqy/checkpoints/dinov2/dinov2_vitg14_pretrain.pth
     
     cond_stage_config:
-      target: ldm.modules.encoders.modules.FrozenCLIPEmbedder
+      target: ldm.modules.encoders.modules.FrozenOpenCLIPEmbedder
       params:
-        version: "/data00/sqy/checkpoints/laion/CLIP-ViT-H-14-laion2B-s32B-b79K"
+        version: /data00/sqy/checkpoints/laion/CLIP-ViT-H-14-laion2B-s32B-b79K/open_clip_pytorch_model.bin

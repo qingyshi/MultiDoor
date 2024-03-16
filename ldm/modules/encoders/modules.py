@@ -270,6 +270,7 @@ class FrozenOpenCLIPImageEncoder(AbstractEncoder):
         return self(image)
 
 sys.path.append("./dinov2")
+# import dinov2.hubconf as hubconf
 import hubconf
 from einops import rearrange
 from omegaconf import OmegaConf
@@ -291,9 +292,11 @@ class FrozenDinoV2Encoder(AbstractEncoder):
         if freeze:
             self.freeze()
         self.image_mean = torch.tensor([0.485, 0.456, 0.406]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
-        self.image_std =  torch.tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)        
+        self.image_std =  torch.tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
+        self.obj_emb = torch.nn.Parameter(torch.randn(2))
+        self.null_token = torch.nn.Parameter(torch.randn(256, 1536))        
         self.projector = nn.Linear(1536, 1024)
-        self.sub_obj_emb = torch.nn.Parameter(torch.randn(2, 1024))
+        self.ln = nn.LayerNorm(1024)
 
     def freeze(self):
         self.model.eval()
@@ -310,7 +313,8 @@ class FrozenDinoV2Encoder(AbstractEncoder):
         
         if len(image.shape) == 5:
             b, n, h, w, c = image.shape
-            image = rearrange(image, 'b n h w c -> (b n) c h w').to(torch.float16)
+            is_obj = torch.zeros(b, n).to(image) != image.sum((-1, -2, -3))
+            image = rearrange(image, 'b n h w c -> (b n) c h w').to(torch.float32)
 
         image = (image.to(self.device)  - self.image_mean.to(self.device)) / self.image_std.to(self.device)
         features = self.model.forward_features(image)
@@ -319,9 +323,12 @@ class FrozenDinoV2Encoder(AbstractEncoder):
         patchtokens = patchtokens.reshape(b, n, 256, -1)
         clstoken = clstoken.reshape(b, n, 1, -1)
         image_features = clstoken + patchtokens # (b, n, 256, 1536)
-        hint = self.projector(image_features) # (b, n, 256, 1024)
-        emb = self.sub_obj_emb.view(1, 2, 1, 1024)
-        hint = hint + emb
+        null_token = self.null_token.view(1, 1, 256, -1)
+        is_obj = is_obj.view(b, n, 1, 1).to(null_token)
+        image_features = is_obj * image_features + (1 - is_obj) * null_token
+        emb = self.obj_emb.view(1, 2, 1, 1)
+        image_features = image_features + emb
+        hint = self.ln(self.projector(image_features)) # (b, n, 256, 1024)
         return hint.flatten(1, 2)
 
     def encode(self, image):

@@ -59,9 +59,9 @@ dataset10 = MoseDataset(**DConf.Train.Mose)
 # dataset11 = FashionTryonDataset(**DConf.Train.FashionTryon)
 dataset12 = LvisDataset(**DConf.Train.Lvis)
 dataset13 = CocoDataset(**DConf.Train.COCO)
-dataset14 = HICODataset(**DConf.Train.HICO)
+# dataset14 = HICODataset(**DConf.Train.HICO)
 
-image_data = [dataset6, dataset8, dataset12, dataset13, dataset14]
+image_data = [dataset6, dataset8, dataset12, dataset13]
 video_data = [dataset1, dataset3, dataset4, dataset7, dataset10]
 
 # The ratio of each dataset is adjusted by setting the __len__ 
@@ -70,7 +70,7 @@ dataloader = DataLoader(dataset, num_workers=8, batch_size=batch_size, shuffle=T
 logger = ImageLogger(batch_frequency=logger_freq)
 
 checkpoint_callback = ModelCheckpoint(
-    dirpath="checkpoints/",
+    dirpath="checkpoints/control/",
     filename="{epoch}",
     save_top_k=-1,
     every_n_epochs=1,

@@ -118,13 +118,11 @@ def process_pairs(ref_image, ref_mask, tar_image, tar_mask):
         tar_box_yyxx_crop = box2squre(tar_image, tar_box_yyxx_crop) # crop box
         multi_subject_bbox_crop.append(tar_box_yyxx_crop)
     
-    y1, x1 = min([[bbox[0], bbox[2]] for bbox in multi_subject_bbox])
-    y2, x2 = max([[bbox[1], bbox[3]] for bbox in multi_subject_bbox])
-    tar_box_yyxx = (y1, y2, x1, x2)
-    
     # bbox which contains multi-subjects
-    y1, x1 = min([[bbox[0], bbox[2]] for bbox in multi_subject_bbox_crop])
-    y2, x2 = max([[bbox[1], bbox[3]] for bbox in multi_subject_bbox_crop])
+    y1 = min([bbox[0] for bbox in multi_subject_bbox_crop])
+    x1 = min([bbox[2] for bbox in multi_subject_bbox_crop])
+    y2 = max([bbox[1] for bbox in multi_subject_bbox_crop])
+    x2 = max([bbox[3] for bbox in multi_subject_bbox_crop])
     tar_box_yyxx_crop = (y1, y2, x1, x2)
     cropped_target_image = tar_image[y1: y2, x1: x2, :]
     collage = cropped_target_image.copy()
@@ -182,7 +180,7 @@ def process_multi_pairs(ref_image, ref_mask, tar_image, tar_mask):
         
     '''
     # ========= Reference ===========
-        # Get the outline Box of the reference image
+    # Get the outline Box of the reference image
     multi_subject_ref_image = []
     multi_subject_ref_mask = []
     
@@ -345,7 +343,7 @@ def inference_single_image(ref_image, ref_mask, tar_image, tar_mask, caption, gu
     dino_input = torch.from_numpy(ref.copy()).float().cuda() 
     dino_input = torch.stack([dino_input for _ in range(num_samples)], dim=0)
     dino_input = dino_input.clone().to('cuda')
-    ref_token = model.ref_encoder(dino_input)   # (b, 30, 1024)
+    img_token = model.img_encoder(dino_input)   # (b, n * 256, 1024)
 
     guess_mode = False
     H, W = 512, 512
@@ -355,8 +353,8 @@ def inference_single_image(ref_image, ref_mask, tar_image, tar_mask, caption, gu
     uncond = model.get_unconditional_conditioning(num_samples) # (b, 77, 1024)
     # caption_embedding: (b, 77, 1024)
     
-    cond = {"c_concat": [control], "c_crossattn": [cond_text], "ref_token": [ref_token]}
-    un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [uncond], "ref_token": [ref_token]}
+    cond = {"c_concat": [control], "c_crossattn": [cond_text], "img_token": [img_token]}
+    un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [uncond], "img_token": [img_token]}
     shape = (4, H // 8, W // 8)
 
     if save_memory:
@@ -397,7 +395,7 @@ def inference_single_image(ref_image, ref_mask, tar_image, tar_mask, caption, gu
 
 if __name__ == '__main__': 
     # ==== Example for inferring a single image ===
-    name = 'ride'
+    name = 'dog'
     reference_image_path = ['examples/' + name + '/ref1.jpg', 'examples/' + name + '/ref2.jpg'] if os.path.exists('examples/' + name + '/ref1.jpg') else 'examples/' + name + '/ref.jpg'
     reference_mask_path = ['examples/' + name + '/0.png', 'examples/' + name + '/1.png']
     bg_image_path = 'examples/' + name + '/scene.jpg'
@@ -405,7 +403,7 @@ if __name__ == '__main__':
     # bg_image_path = 'examples/TestDreamBooth/BG/000000047948_GT.png'
     # bg_mask_path = ['examples/TestDreamBooth/BG/000000047948_mask.png', 'examples/TestDreamBooth/BG/000000309203_mask.png']
     save_path = 'examples/' + name + '/gen_res.png'
-    caption = ['A woman is riding a horse with a grass land behind her']
+    caption = ['Two golden retrievers are playing with each other on the road, they looks very happy.']
 
     # reference image + reference mask
     # You could use the demo of SAM to extract RGB-A image with masks
@@ -440,7 +438,6 @@ if __name__ == '__main__':
         vis_image = cv2.hconcat([ref_image, back_image, hint, gen_image])
     
     cv2.imwrite(save_path, vis_image [:, :, ::-1])
-    # cv2.imwrite(save_path, gen_image)
     print('finish!')
     #'''
     #'''

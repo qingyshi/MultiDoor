@@ -34,7 +34,7 @@ class BaseDataset(Dataset):
         transform = A.Compose([
             A.HorizontalFlip(p=0.5),
             A.RandomBrightnessContrast(p=0.5),
-            A.Rotate(limit=20, border_mode=cv2.BORDER_CONSTANT, value=(0,0,0)),
+            # A.Rotate(limit=20, border_mode=cv2.BORDER_CONSTANT, value=(0,0,0)),
             ])
 
         transformed = transform(image=image.astype(np.uint8), mask=mask)
@@ -142,7 +142,7 @@ class BaseDataset(Dataset):
         
         for single_mask in ref_mask:
             ref_box_yyxx = get_bbox_from_mask(single_mask)
-            assert self.check_region_size(single_mask, ref_box_yyxx, ratio=0.10, mode='min') == True
+            # assert self.check_region_size(single_mask, ref_box_yyxx, ratio=0.10, mode='min') == True
         
             # Filtering background for the reference image
             ref_mask_3 = np.stack([single_mask, single_mask, single_mask], -1)

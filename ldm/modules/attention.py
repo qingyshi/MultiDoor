@@ -248,7 +248,7 @@ class MemoryEfficientCrossAttention(nn.Module):
 
 
 
-class GatedCrossAttention(nn.Module):
+class IPCrossAttention(nn.Module):
     ATTENTION_MODES = {
         "softmax": CrossAttention,  # vanilla attention
         "softmax-xformers": MemoryEfficientCrossAttention
@@ -262,7 +262,7 @@ class GatedCrossAttention(nn.Module):
                               heads=n_heads, dim_head=d_head, dropout=dropout)
         self.norm1 = nn.LayerNorm(query_dim)
 
-        self.register_parameter('alpha_attn', nn.Parameter(torch.tensor(0.)) )
+        # self.register_parameter('alpha_attn', nn.Parameter(torch.tensor(0.)) )
 
         # this can be useful: we can externally change magnitude of tanh(alpha)
         # for example, when it is set to 0, then the entire model is same as original one 
@@ -270,7 +270,7 @@ class GatedCrossAttention(nn.Module):
 
     def forward(self, x, subjects):
         attention_output = self.attn1(self.norm1(x), subjects)
-        return self.scale * torch.tanh(self.alpha_attn) * attention_output
+        return self.scale * attention_output
 
 
 class BasicTransformerBlock(nn.Module):
@@ -297,8 +297,8 @@ class BasicTransformerBlock(nn.Module):
         self.checkpoint = checkpoint
         
         if not is_controlnet:
-            self.fuser = GatedCrossAttention(query_dim=dim, sub_dim=context_dim,
-                                    n_heads=n_heads, d_head=d_head, dropout=dropout)  # is self-attn if context is none
+            self.fuser = IPCrossAttention(query_dim=dim, sub_dim=context_dim,
+                                n_heads=n_heads, d_head=d_head, dropout=dropout)  # is self-attn if context is none
         self.ip_adapter = ip_adapter
 
     def forward(self, x, caption=None, subject=None):
@@ -311,8 +311,8 @@ class BasicTransformerBlock(nn.Module):
         if subject is not None:
             if self.ip_adapter:
                 x1 = self.fuser(x, subjects=subject)
-                x2 = self.attn2(self.norm2(x), context=caption) + x
-                x = x1 + x2
+                x2 = self.attn2(self.norm2(x), context=caption)
+                x = x1 + x2 + x
             else:
                 x = self.fuser(x, subjects=subject) + x
                 x = self.attn2(self.norm2(x), context=caption) + x
