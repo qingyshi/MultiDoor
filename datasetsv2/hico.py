@@ -23,8 +23,14 @@ class HICODataset(BaseDataset):
         self.dynamic = 0
     
     def __len__(self):
-        return 40000
+        return len(self.data)
     
+    def sample_timestep(self, max_step=1000):
+        step_start = 0
+        step_end = max_step
+        step = np.random.randint(step_start, step_end)
+        return np.array([step])
+
     def get_sample(self, index):
         filename = self.data[index]
         relationships = self.annotations[index]
@@ -33,7 +39,7 @@ class HICODataset(BaseDataset):
         num_relationship = len(verbs)
         chosen_ids = int(np.random.choice(num_relationship, 1))
         verb: str = self.ids2verb[verbs[chosen_ids]].replace("_", " ")
-        obj: str = self.ids2obj[objs[chosen_ids]]
+        obj: str = self.ids2obj[objs[chosen_ids]].replace("_", " ")
         caption = f"The person is {verb}ing the {obj}"
         
         image_path = os.path.join(self.image_dir, filename)

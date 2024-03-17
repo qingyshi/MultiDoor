@@ -148,6 +148,6 @@ hf_down.py
 cache_dir/
 .vscode/
 .demo
-data
-examples
+data/
+examples/
 test.py

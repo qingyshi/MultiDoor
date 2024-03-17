@@ -15,7 +15,7 @@ from share import *
 from cldm.model import create_model
 
 
-# python tool_add_fuser_sd21.py /data00/sqy/checkpoints/stable-diffusion-2-1-base/v2-1_512-ema-pruned.ckpt checkpoints/adapter_sd21_ini.ckpt
+# python tool_add_fuser_sd21.py /data00/sqy/checkpoints/anydoor/AnyDoor/epoch=1-step=8687.ckpt checkpoints/adapter_sd21_ini.ckpt
 
 def get_node_name(name, parent_name):
     if len(name) <= len(parent_name):
@@ -36,7 +36,11 @@ scratch_dict = model.state_dict()
 
 target_dict = {}
 for k in scratch_dict.keys():
-    if "fuser.attn1" in k:
+    if "cond_stage_model" in k:
+        continue
+    elif "img_encoder" in k:
+        copy_k = k.replace("img_encoder", "cond_stage_model")  
+    elif "fuser.attn1" in k:
         copy_k = k.replace("fuser.attn1", "attn2")
     elif "fuser.norm1" in k:
         copy_k = k.replace("fuser.norm1", "norm2")
@@ -47,8 +51,7 @@ for k in scratch_dict.keys():
         target_dict[k] = pretrained_weights[copy_k].clone()
     else:
         target_dict[k] = scratch_dict[k].clone()
-        if "img_encoder" not in k:
-            print(f'These weights are newly added: {k}')
+        print(f'These weights are newly added: {k}')
 
 model.load_state_dict(target_dict, strict=False)
 torch.save(model.state_dict(), output_path)

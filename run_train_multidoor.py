@@ -27,7 +27,7 @@ if save_memory:
     enable_sliced_attention()
 
 # Configs
-resume_path = 'checkpoints/control_sd21_ini.ckpt'
+resume_path = 'checkpoints/control/epoch=5.ckpt'
 batch_size = 4
 logger_freq = 2000
 learning_rate = 1e-5

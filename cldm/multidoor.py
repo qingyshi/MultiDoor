@@ -40,14 +40,15 @@ class MultiDoor(ControlLDM):
     def configure_optimizers(self):
         lr = self.learning_rate
         params = list(self.control_model.parameters())
-        params += list(self.model.diffusion_model.out.parameters())
         params += list(self.img_encoder.projector.parameters())
         params += list(self.img_encoder.ln.parameters())
+        params += list(self.model.diffusion_model.output_blocks.parameters())
+        params += list(self.model.diffusion_model.out.parameters())
         params.append(self.img_encoder.obj_emb)
         params.append(self.img_encoder.null_token)
-        for name, param in self.named_parameters():
-            if 'transformer_blocks' in name and 'fuser' in name:
-                params.append(param)
+        # for name, param in self.named_parameters():
+        #     if 'transformer_blocks' in name and 'fuser' in name:
+        #         params.append(param)
         opt = torch.optim.AdamW(params, lr=lr)
         return opt
     
