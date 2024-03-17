@@ -219,13 +219,13 @@ def inference_single_image(ref_image, ref_mask, tar_image, tar_mask, guidance_sc
     return gen_image
 
 
-if __name__ == '__main__': 
+def run_and_save(reference_image_path=None, bg_image_path=None, save_path=None):
     # ==== Example for inferring a single image ===
-    reference_image_path = 'examples/ride/ref.jpg'
-    reference_mask_path = 'examples/ride/0.png'
-    bg_image_path = 'examples/ride/scene.jpg'
-    bg_mask_path = 'examples/ride/tar01.png'
-    save_path = 'examples/ride/GEN/gen_res.png'
+    reference_image_path = 'examples/dataset/clock/01.jpg'
+    reference_mask_path = reference_image_path.replace("jpg", "png")
+    bg_image_path = 'examples/TestDreamBooth/BG/000000309203_GT.png'
+    bg_mask_path = 'examples/TestDreamBooth/BG/000000047948_mask.png'
+    save_path = 'examples/TestDreamBooth/GEN/gen_res11.png'
 
     # reference image + reference mask
     # You could use the demo of SAM to extract RGB-A image with masks
@@ -290,3 +290,6 @@ if __name__ == '__main__':
     #     vis_image = cv2.hconcat([ref_image, gt_image, gen_image])
     #     cv2.imwrite(gen_path, vis_image[:,:,::-1])
     #'''
+
+if __name__ == '__main__': 
+    run_and_save()
