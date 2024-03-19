@@ -12,12 +12,12 @@ class SaliencyDataset(BaseDataset):
     def __init__(self, MSRA_root, TR_root, TE_root, HFlickr_root):
         image_mask_dict = {}
 
-        # # ====== MSRA-10k ======
-        # file_lst = os.listdir(MSRA_root)
-        # image_lst = [MSRA_root+i for i in file_lst if '.jpg' in i]
-        # for i in image_lst:
-        #     mask_path = i.replace('.jpg','.png')
-        #     image_mask_dict[i] = mask_path
+        # ====== MSRA-10k ======
+        file_lst = os.listdir(MSRA_root)
+        image_lst = [MSRA_root+i for i in file_lst if '.jpg' in i]
+        for i in image_lst:
+            mask_path = i.replace('.jpg','.png')
+            image_mask_dict[i] = mask_path
 
         # ===== DUT-TR ========
         file_lst = os.listdir(TR_root)
@@ -26,12 +26,12 @@ class SaliencyDataset(BaseDataset):
             mask_path = i.replace('.jpg','.png').replace('DUTS-TR-Image','DUTS-TR-Mask')
             image_mask_dict[i] = mask_path
         
-        # # ===== DUT-TE ========
-        # file_lst = os.listdir(TE_root)
-        # image_lst = [TE_root+i for i in file_lst if '.jpg' in i]
-        # for i in image_lst:
-        #     mask_path = i.replace('.jpg','.png').replace('DUTS-TE-Image','DUTS-TE-Mask')
-        #     image_mask_dict[i] = mask_path 
+        # ===== DUT-TE ========
+        file_lst = os.listdir(TE_root)
+        image_lst = [TE_root+i for i in file_lst if '.jpg' in i]
+        for i in image_lst:
+            mask_path = i.replace('.jpg','.png').replace('DUTS-TE-Image','DUTS-TE-Mask')
+            image_mask_dict[i] = mask_path 
         
         # ===== HFlickr =======
         file_lst = os.listdir(HFlickr_root)

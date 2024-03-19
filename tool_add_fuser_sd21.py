@@ -15,7 +15,7 @@ from share import *
 from cldm.model import create_model
 
 
-# python tool_add_fuser_sd21.py /data00/sqy/checkpoints/anydoor/AnyDoor/epoch=1-step=8687.ckpt checkpoints/adapter_sd21_ini.ckpt
+# python tool_add_fuser_sd21.py /data00/sqy/checkpoints/anydoor/AnyDoor/epoch=1-step=8687.ckpt checkpoints/anydoor_ini.ckpt
 
 def get_node_name(name, parent_name):
     if len(name) <= len(parent_name):
@@ -26,7 +26,7 @@ def get_node_name(name, parent_name):
     return True, name[len(parent_name):]
 
 
-model = create_model(config_path='./configs/multiadapter.yaml')
+model = create_model(config_path='./configs/multidoor.yaml')
 
 pretrained_weights = torch.load(input_path)
 if 'state_dict' in pretrained_weights:

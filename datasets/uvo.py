@@ -10,7 +10,7 @@ from .base import BaseDataset
 from pycocotools import mask as mask_utils
 
 class UVODataset(BaseDataset):
-    def __init__(self, image_dir, video_json, image_json):
+    def __init__(self, image_dir, video_json, image_json, caption):
         json_path = video_json 
         with open(json_path, 'r') as fcc_file:
             data = json.load(fcc_file)
@@ -19,6 +19,10 @@ class UVODataset(BaseDataset):
         with open(image_json_path , 'r') as image_file:
             video_dict = json.load(image_file)
 
+        with open(caption, 'r') as caption_file:
+            caption = json.load(caption_file)
+            
+        self.caption = caption
         self.image_root =  image_dir
         self.data = data['annotations']
         self.video_dict = video_dict
@@ -27,7 +31,7 @@ class UVODataset(BaseDataset):
         self.dynamic = 1
 
     def __len__(self):
-        return 25000
+        return 20000
 
     def check_region_size(self, image, yyxx, ratio, mode = 'max'):
         pass_flag = True
@@ -49,7 +53,8 @@ class UVODataset(BaseDataset):
         video_names = self.video_dict[video_id]
         masks = ins_anno['segmentations']
         frames = video_names
-
+        caption = self.load_caption(video_id)
+        
         # Sampling frames
         min_interval = len(frames)  // 10
         start_frame_index = np.random.randint(low=0, high=len(frames) - min_interval)
@@ -75,5 +80,10 @@ class UVODataset(BaseDataset):
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()
         item_with_collage['time_steps'] = sampled_time_steps
+        # item_with_collage['caption'] = caption
+        item_with_collage['img_path'] = tar_image_path
+        # item_with_collage['video_id'] = video_id
+        item_with_collage['caption'] = caption
+        
         return item_with_collage
 

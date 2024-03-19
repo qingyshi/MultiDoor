@@ -27,13 +27,13 @@ if save_memory:
     enable_sliced_attention()
 
 # Configs
-resume_path = 'checkpoints/control/epoch=5.ckpt'
+resume_path = 'checkpoints/anydoor_ini.ckpt'
 batch_size = 4
 logger_freq = 2000
 learning_rate = 1e-5
 sd_locked = False
 only_mid_control = False
-n_gpus = 4
+n_gpus = 2
 accumulate_grad_batches = 1
 max_epochs = 12
 
@@ -50,38 +50,33 @@ dataset1 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)
 # dataset2 =  SaliencyDataset(**DConf.Train.Saliency) 
 dataset3 = VIPSegDataset(**DConf.Train.VIPSeg) 
 dataset4 = YoutubeVISDataset(**DConf.Train.YoutubeVIS) 
-dataset5 = MVImageNetDataset(**DConf.Train.MVImageNet)
-dataset6 = SAMDataset(**DConf.Train.SAM)
-dataset7 = UVODataset(**DConf.Train.UVO.train)
-dataset8 = VitonHDDataset(**DConf.Train.VitonHD)
+# dataset5 = MVImageNetDataset(**DConf.Train.MVImageNet)
+# dataset6 = SAMDataset(**DConf.Train.SAM)
+# dataset7 = UVODataset(**DConf.Train.UVO.train)
+# dataset8 = VitonHDDataset(**DConf.Train.VitonHD)
 # dataset9 = UVOValDataset(**DConf.Train.UVO.val)
-dataset10 = MoseDataset(**DConf.Train.Mose)
+# dataset10 = MoseDataset(**DConf.Train.Mose)
 # dataset11 = FashionTryonDataset(**DConf.Train.FashionTryon)
-dataset12 = LvisDataset(**DConf.Train.Lvis)
+# dataset12 = LvisDataset(**DConf.Train.Lvis)
 dataset13 = CocoDataset(**DConf.Train.COCO)
 # dataset14 = HICODataset(**DConf.Train.HICO)
 
-image_data = [dataset6, dataset8, dataset12, dataset13]
-video_data = [dataset1, dataset3, dataset4, dataset7, dataset10]
+# image_data = [dataset6, dataset8, dataset12, dataset13]
+# video_data = [dataset1, dataset3, dataset4, dataset7, dataset10]
+image_data = [dataset13]
+video_data = [dataset1, dataset3, dataset4]
 
 # The ratio of each dataset is adjusted by setting the __len__ 
 dataset = ConcatDataset(image_data + video_data + video_data)
 dataloader = DataLoader(dataset, num_workers=8, batch_size=batch_size, shuffle=True)
-logger = ImageLogger(batch_frequency=logger_freq)
+logger = ImageLogger(batch_frequency=logger_freq, split='anydoor_init')
 
-checkpoint_callback = ModelCheckpoint(
-    dirpath="checkpoints/control/",
-    filename="{epoch}",
-    save_top_k=-1,
-    every_n_epochs=1,
-    verbose=True,
-)
 trainer = pl.Trainer(
     gpus=n_gpus,
     strategy="ddp",
     precision=16,
     accelerator="gpu",
-    callbacks=[logger, checkpoint_callback],
+    callbacks=[logger],
     progress_bar_refresh_rate=1,
     accumulate_grad_batches=accumulate_grad_batches,
     max_epochs=max_epochs

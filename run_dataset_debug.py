@@ -1,18 +1,19 @@
-from datasetsv2.ytb_vos import YoutubeVOSDataset
-from datasetsv2.ytb_vis import YoutubeVISDataset
-from datasetsv2.saliency_modular import SaliencyDataset
-from datasetsv2.vipseg import VIPSegDataset
-from datasetsv2.mvimagenet import MVImageNetDataset
-from datasetsv2.sam import SAMDataset
-from datasetsv2.dreambooth import DreamBoothDataset
-from datasetsv2.uvo import UVODataset
-from datasetsv2.uvo_val import UVOValDataset
-from datasetsv2.mose import MoseDataset
-from datasetsv2.vitonhd import VitonHDDataset
-from datasetsv2.fashiontryon import FashionTryonDataset
-from datasetsv2.lvis import LvisDataset
-from datasetsv2.coco import CocoDataset
-from datasetsv2.hico import HICODataset
+from datasets.ytb_vos import YoutubeVOSDataset
+from datasets.ytb_vis import YoutubeVISDataset
+from datasets.saliency_modular import SaliencyDataset
+from datasets.vipseg import VIPSegDataset
+from datasets.mvimagenet import MVImageNetDataset
+from datasets.sam import SAMDataset
+from datasets.dreambooth import DreamBoothDataset
+from datasets.uvo import UVODataset
+from datasets.uvo_val import UVOValDataset
+from datasets.mose import MoseDataset
+from datasets.vitonhd import VitonHDDataset
+from datasets.fashiontryon import FashionTryonDataset
+from datasets.lvis import LvisDataset
+from datasets.coco import CocoDataset
+from datasets.hico import HICODataset
+from datasets.psg import PSGDataset
 from torch.utils.data import ConcatDataset
 from torch.utils.data import DataLoader
 import numpy as np 
@@ -36,6 +37,7 @@ DConf = OmegaConf.load('./configs/datasets.yaml')
 # dataset12 = LvisDataset(**DConf.Train.Lvis)
 # dataset13 = CocoDataset(**DConf.Train.COCO)
 dataset14 = HICODataset(**DConf.Train.HICO)
+# dataset15 = PSGDataset()
 
 # image_data = [dataset12]
 # video_data = [dataset1, dataset3, dataset4]

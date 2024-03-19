@@ -296,7 +296,7 @@ class FrozenDinoV2Encoder(AbstractEncoder):
         self.obj_emb = torch.nn.Parameter(torch.randn(2))
         self.null_token = torch.nn.Parameter(torch.randn(256, 1536))        
         self.projector = nn.Linear(1536, 1024)
-        self.ln = nn.LayerNorm(1024)
+        # self.ln = nn.LayerNorm(1024)
 
     def freeze(self):
         self.model.eval()
@@ -328,7 +328,8 @@ class FrozenDinoV2Encoder(AbstractEncoder):
         image_features = is_obj * image_features + (1 - is_obj) * null_token
         emb = self.obj_emb.view(1, 2, 1, 1)
         image_features = image_features + emb
-        hint = self.ln(self.projector(image_features)) # (b, n, 256, 1024)
+        # hint = self.ln(self.projector(image_features)) # (b, n, 256, 1024)
+        hint = self.projector(image_features)
         return hint.flatten(1, 2)
 
     def encode(self, image):

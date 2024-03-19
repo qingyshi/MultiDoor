@@ -14,8 +14,8 @@ class CocoDataset(BaseDataset):
         self.coco = COCO(annotation)
         self.data = list(sorted(self.coco.imgs.keys()))
         
-        with open(caption) as f:
-            self.caption = json.load(f)
+        # with open(caption) as f:
+        #     self.caption = json.load(f)
         
         self.transforms = transforms
         self.cat_to_names = {cat_id: cat['name'] for cat_id, cat in self.coco.cats.items()}
@@ -28,11 +28,11 @@ class CocoDataset(BaseDataset):
         coco_annotation = coco.loadAnns(ann_ids)
         path = coco.loadImgs(img_id)[0]['file_name']
         
-        if path not in self.caption:
-            raise Exception
-        else:
-            caption_ann = self.caption[path]
-            caption = caption_ann['caption']
+        # if path not in self.caption:
+        #     raise Exception
+        # else:
+        #     caption_ann = self.caption[path]
+        #     caption = caption_ann['caption']
         #     class_token_ids = caption_ann['class_token_ids']
         #     names = caption_ann['names']
             
@@ -51,9 +51,9 @@ class CocoDataset(BaseDataset):
         elif num_objs == 1:
             chosen_objs = [0]
         else:
-            chosen_objs = []
-            masks.append(np.zeros_like(img)[:, :, -1])
+            raise Exception
         
+        names = []
         for i, idx in enumerate(chosen_objs):
             ann = coco_annotation[idx]
             if 'segmentation' in ann:
@@ -61,9 +61,11 @@ class CocoDataset(BaseDataset):
                 masks.append(mask)
             else:
                 masks.append(np.zeros((img.height, img.width)))
+            names.append(self.cat_to_names[ann['category_id']])
 
-            # names.append(self.cat_to_names[ann['category_id']])
-
+        caption = ", ".join(names)
+        if len(names) == 1:
+            caption = caption + ', nothing'
         # labels = torch.tensor([ann['category_id'] for ann in coco_annotation], dtype=torch.int64)
         item_with_collage = self.process_pairs(ref_image=img, ref_mask=masks, 
                                                tar_image=img.copy(), tar_mask=masks.copy())

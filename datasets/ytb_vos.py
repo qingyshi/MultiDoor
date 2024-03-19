@@ -9,7 +9,7 @@ from .data_utils import *
 from .base import BaseDataset
 
 class YoutubeVOSDataset(BaseDataset):
-    def __init__(self, image_dir, anno, meta):
+    def __init__(self, image_dir, anno, meta, caption):
         self.image_root = image_dir
         self.anno_root = anno
         self.meta_file = meta
@@ -20,7 +20,11 @@ class YoutubeVOSDataset(BaseDataset):
             records = records["videos"]
             for video_id in records:
                 video_dirs.append(video_id)
-
+        
+        # with open(caption) as f:
+        #     caption = json.load(f)
+        
+        # self.caption = caption
         self.records = records
         self.data = video_dirs
         self.size = (512,512)
@@ -46,13 +50,25 @@ class YoutubeVOSDataset(BaseDataset):
 
     def get_sample(self, idx):
         video_id = list(self.records.keys())[idx]
-        objects_id = np.random.choice( list(self.records[video_id]["objects"].keys()) )
-        frames = self.records[video_id]["objects"][objects_id]["frames"]
+        # caption = self.load_caption(video_id)
+        
+        objects = list(self.records[video_id]["objects"].keys())
+        if len(objects) >= 2:
+            objects_ids = np.random.choice(list(self.records[video_id]["objects"].keys()), 2, replace=False)
+            frames = [self.records[video_id]["objects"][str(objects_id)]["frames"] for objects_id in objects_ids]
+            frames = np.intersect1d(*frames)
+        elif len(objects) == 1:
+            objects_ids = np.array(objects)
+            frames = self.records[video_id]["objects"][str(objects[0])]["frames"]
+        else:
+            raise Exception
+        names = [self.records[video_id]["objects"][str(objects_id)]["category"] for objects_id in objects_ids]
 
+        caption = ", ".join(names) if len(names) == 2 else names[0] + ", nothing"
         # Sampling frames
-        min_interval = len(frames)  // 10
+        min_interval = len(frames) // 10
         start_frame_index = np.random.randint(low=0, high=len(frames) - min_interval)
-        end_frame_index = start_frame_index + np.random.randint(min_interval,  len(frames) - start_frame_index )
+        end_frame_index = start_frame_index + np.random.randint(min_interval, len(frames) - start_frame_index)
         end_frame_index = min(end_frame_index, len(frames) - 1)
 
         # Get image path
@@ -70,18 +86,23 @@ class YoutubeVOSDataset(BaseDataset):
         tar_image = cv2.imread(tar_image_path)
         tar_image = cv2.cvtColor(tar_image, cv2.COLOR_BGR2RGB)
 
-        ref_mask = Image.open(ref_mask_path ).convert('P')
+        ref_mask = Image.open(ref_mask_path).convert('P')
         ref_mask= np.array(ref_mask)
-        ref_mask = ref_mask == int(objects_id)
+        ref_mask = [ref_mask == int(objects_id) for objects_id in objects_ids]
 
-        tar_mask = Image.open(tar_mask_path ).convert('P')
+        tar_mask = Image.open(tar_mask_path).convert('P')
         tar_mask= np.array(tar_mask)
-        tar_mask = tar_mask == int(objects_id)
-
+        tar_mask = [tar_mask == int(objects_id) for objects_id in objects_ids]
 
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()
+        
         item_with_collage['time_steps'] = sampled_time_steps
+        # item_with_collage['obj_ids'] = objects_ids
+        item_with_collage['img_path'] = tar_image_path
+        # item_with_collage['video_id'] = video_id
+        item_with_collage['caption'] = caption
+
         return item_with_collage
 
 

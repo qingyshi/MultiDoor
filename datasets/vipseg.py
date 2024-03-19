@@ -11,7 +11,7 @@ from PIL import Image
 from .base import BaseDataset
 
 class VIPSegDataset(BaseDataset):
-    def __init__(self, image_dir, anno):
+    def __init__(self, image_dir, anno, meta, caption):
         self.image_root = image_dir
         self.anno_root = anno
         video_dirs = []
@@ -20,9 +20,26 @@ class VIPSegDataset(BaseDataset):
         self.size = (512,512)
         self.clip_size = (224,224)
         self.dynamic = 1
+        
+        # with open(caption, 'r') as file:
+        #     caption = json.load(file)
+            
+        # self.caption = caption
+        with open(meta, 'r') as file:
+            ann = json.load(file)
+        
+        self.vid_id2frame_ann = {}
+        for video_ann in ann['annotations']:
+            self.vid_id2frame_ann[video_ann['video_id']] = video_ann['annotations']   # list: annotations per frame
+            
+        self.id2name = {}
+        self.id2is_thing = {}
+        for cat in ann['categories']:
+            self.id2name[cat['id']] = cat['name']
+            self.id2is_thing[cat['id']] = cat['isthing']
 
     def __len__(self):
-        return 30000
+        return 40000
 
     def check_region_size(self, image, yyxx, ratio, mode = 'max'):
         pass_flag = True
@@ -40,15 +57,21 @@ class VIPSegDataset(BaseDataset):
 
     def get_sample(self, idx):
         video_name = self.data[idx]
+        
+        # caption = self.load_caption(video_name)
+            
+        ann_per_frame = self.vid_id2frame_ann[video_name]     # list
         video_path = os.path.join(self.image_root, video_name)
         frames = os.listdir(video_path)
 
         # Sampling frames
-        min_interval = len(frames)  // 100
+        min_interval = len(frames) // 100
         start_frame_index = np.random.randint(low=0, high=len(frames) - min_interval)
-        end_frame_index = start_frame_index + np.random.randint(min_interval,  len(frames) - start_frame_index )
+        end_frame_index = start_frame_index + np.random.randint(min_interval, len(frames) - start_frame_index)
         end_frame_index = min(end_frame_index, len(frames) - 1)
-
+        end_frame_ann = ann_per_frame[end_frame_index]
+        # start_end_frame_index = [start_frame_index, end_frame_index]
+        
         # Get image path
         ref_image_name = frames[start_frame_index]
         tar_image_name = frames[end_frame_index]
@@ -71,22 +94,40 @@ class VIPSegDataset(BaseDataset):
         tar_mask = np.array(Image.open(tar_mask_path).convert('RGB'))
         tar_mask = rgb2id(tar_mask)
         
-        ref_ids = np.unique(ref_mask) 
+        ref_ids = np.unique(ref_mask)
         tar_ids = np.unique(tar_mask)
 
         common_ids = list(np.intersect1d(ref_ids, tar_ids))
-        common_ids = [ i  for i in common_ids if i != 0 ]
+        common_ids = [i for i in common_ids if i != 0]
+        
+        if len(common_ids) >= 2:
+            chosen_id = np.random.choice(common_ids, 2, replace=False)
+        elif len(common_ids) == 1:
+            chosen_id = np.array(common_ids)
+        else:
+            raise Exception
+        
+        chosen_cat_id = []
+        for single_id in chosen_id:
+            obj_ids = [obj['id'] for obj in end_frame_ann['segments_info']]
+            chosen_cat_id.append(obj_ids.index(single_id))
+        
+        # chosen_id = obj_ids        
+        names = [self.id2name[cat_id] for cat_id in chosen_cat_id]
+        caption = ", ".join(names) if len(names) == 2 else names[0] + ", nothing"
+        ref_mask = [ref_mask == single_id for single_id in chosen_id]
+        tar_mask = [tar_mask == single_id for single_id in chosen_id]
 
-        chosen_id = np.random.choice(common_ids)
-        ref_mask = ref_mask == chosen_id 
-        tar_mask = tar_mask == chosen_id 
-
-        len_mask = len( self.check_connect( ref_mask.astype(np.uint8) ) )
+        len_mask = len(self.check_connect(ref_mask[0].astype(np.uint8)))
         assert len_mask == 1
 
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()
+        
         item_with_collage['time_steps'] = sampled_time_steps
+        # item_with_collage['video_id'] = video_name
+        item_with_collage['img_path'] = tar_image_path
+        item_with_collage['caption'] = caption
         return item_with_collage
 
     def check_connect(self, mask):

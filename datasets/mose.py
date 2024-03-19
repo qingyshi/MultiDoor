@@ -10,7 +10,7 @@ from PIL import Image
 from .base import BaseDataset
 
 class MoseDataset(BaseDataset):
-    def __init__(self, image_dir, anno):
+    def __init__(self, image_dir, anno, caption):
         self.image_root = image_dir
         self.anno_root = anno
 
@@ -20,6 +20,9 @@ class MoseDataset(BaseDataset):
         self.size = (512,512)
         self.clip_size = (224,224)
         self.dynamic = 2
+        with open(caption, 'r') as file:
+            caption = json.load(file)
+        self.caption = caption
 
     def __len__(self):
         return 40000
@@ -42,7 +45,8 @@ class MoseDataset(BaseDataset):
         video_name = self.data[idx]
         video_path = os.path.join(self.image_root, video_name)
         frames = os.listdir(video_path)
-
+        caption = self.load_caption(video_name)
+        
         # Sampling frames
         min_interval = len(frames)  // 10
         start_frame_index = np.random.randint(low=0, high=len(frames) - min_interval)
@@ -76,15 +80,22 @@ class MoseDataset(BaseDataset):
 
         common_ids = list(np.intersect1d(ref_ids, tar_ids))
         common_ids = [ i  for i in common_ids if i != 0 ]
-        assert len(common_ids) > 0 
-        chosen_id = np.random.choice(common_ids)
-        ref_mask = ref_mask == chosen_id 
-        tar_mask = tar_mask == chosen_id 
-        len_mask = len( self.check_connect( ref_mask.astype(np.uint8) ) )
+        assert len(common_ids) > 0
+        if len(common_ids) >= 2:
+            chosen_ids = np.random.choice(common_ids, 2, replace=False)
+        else:
+            chosen_ids = np.array(common_ids)
+        ref_mask = [ref_mask == chosen_id for chosen_id in chosen_ids]
+        tar_mask = [tar_mask == chosen_id for chosen_id in chosen_ids]
+        len_mask = len( self.check_connect( ref_mask[0].astype(np.uint8) ) )
         assert len_mask == 1
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()
         item_with_collage['time_steps'] = sampled_time_steps
+        item_with_collage['img_path'] = tar_image_path
+        # item_with_collage['video_id'] = video_name
+        item_with_collage['caption'] = caption
+        
         return item_with_collage
 
     def check_connect(self, mask):

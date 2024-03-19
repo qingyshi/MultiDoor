@@ -23,7 +23,7 @@ class HICODataset(BaseDataset):
         self.dynamic = 0
     
     def __len__(self):
-        return len(self.data)
+        return 40000
     
     def sample_timestep(self, max_step=1000):
         step_start = 0
@@ -38,9 +38,9 @@ class HICODataset(BaseDataset):
         objs = relationships['object']
         num_relationship = len(verbs)
         chosen_ids = int(np.random.choice(num_relationship, 1))
-        verb: str = self.ids2verb[verbs[chosen_ids]].replace("_", " ")
+        verb: str = self.ids2verb[verbs[chosen_ids]].replace("_", "ing ")
         obj: str = self.ids2obj[objs[chosen_ids]].replace("_", " ")
-        caption = f"The person is {verb}ing the {obj}"
+        caption = f"The person {verb} the {obj}"
         
         image_path = os.path.join(self.image_dir, filename)
         subject_path = os.path.join(self.mask_dir, filename, str(chosen_ids), "subject.png")

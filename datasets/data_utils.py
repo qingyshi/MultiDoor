@@ -16,9 +16,9 @@ def mask_score(mask):
 
 def sobel(img, mask, thresh = 50):
     '''Calculating the high-frequency map.'''
-    H,W = img.shape[0], img.shape[1]
-    img = cv2.resize(img,(256,256))
-    mask = (cv2.resize(mask,(256,256)) > 0.5).astype(np.uint8)
+    H, W = img.shape[0], img.shape[1]
+    img = cv2.resize(img, (256,256))
+    mask = (cv2.resize(mask, (256,256)) > 0.5).astype(np.uint8)
     kernel = np.ones((5,5),np.uint8)
     mask = cv2.erode(mask, kernel, iterations = 2)
     
@@ -31,9 +31,9 @@ def sobel(img, mask, thresh = 50):
     scharr = np.max(scharr,-1) * mask    
     
     scharr[scharr < thresh] = 0.0
-    scharr = np.stack([scharr,scharr,scharr],-1)
-    scharr = (scharr.astype(np.float32)/255 * img.astype(np.float32) ).astype(np.uint8)
-    scharr = cv2.resize(scharr,(W,H))
+    scharr = np.stack([scharr, scharr, scharr],-1)
+    scharr = (scharr.astype(np.float32) / 255 * img.astype(np.float32) ).astype(np.uint8)
+    scharr = cv2.resize(scharr, (W, H))
     return scharr
 
 
@@ -91,14 +91,14 @@ def resize_box(yyxx, H,W,h,w):
 
 
 def get_bbox_from_mask(mask):
-    h,w = mask.shape[0], mask.shape[1]
+    h,w = mask.shape[0],mask.shape[1]
 
     if mask.sum() < 10:
-        return 0, h, 0, w
-    rows = np.any(mask, axis=1)
-    cols = np.any(mask, axis=0)
-    y1, y2 = np.where(rows)[0][[0, -1]]
-    x1, x2 = np.where(cols)[0][[0, -1]]
+        return 0,h,0,w
+    rows = np.any(mask,axis=1)
+    cols = np.any(mask,axis=0)
+    y1,y2 = np.where(rows)[0][[0,-1]]
+    x1,x2 = np.where(cols)[0][[0,-1]]
     return (y1, y2, x1, x2)
 
 
@@ -121,7 +121,7 @@ def expand_bbox(mask, yyxx, ratio=[1.2,2.0], min_crop=0):
     x2 = min(W,x2)
     y1 = max(0,y1)
     y2 = min(H,y2)
-    return (y1,y2,x1,x2)
+    return (y1, y2, x1, x2)
 
 
 def box2squre(image, box):
@@ -141,7 +141,7 @@ def box2squre(image, box):
     x2 = min(W,x2)
     y1 = max(0,y1)
     y2 = min(H,y2)
-    return (y1,y2,x1,x2)
+    return (y1, y2, x1, x2)
 
 
 def pad_to_square(image, pad_value = 255, random = False):
@@ -169,7 +169,7 @@ def pad_to_square(image, pad_value = 255, random = False):
 def box_in_box(small_box, big_box):
     y1,y2,x1,x2 = small_box
     y1_b, _, x1_b, _ = big_box
-    y1, y2, x1, x2 = y1 - y1_b ,y2 - y1_b, x1 - x1_b, x2 - x1_b
+    y1,y2,x1,x2 = y1 - y1_b ,y2 - y1_b, x1 - x1_b ,x2 - x1_b
     return (y1,y2,x1,x2 )
 
 

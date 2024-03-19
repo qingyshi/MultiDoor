@@ -9,18 +9,22 @@ from .data_utils import *
 from .base import BaseDataset
 
 class MVImageNetDataset(BaseDataset):
-    def __init__(self, txt, image_dir):
+    def __init__(self, txt, image_dir, caption):
         with open(txt,"r") as f:
             data = f.read().split('\n')[:-1]    
         self.image_dir = image_dir 
         self.data = data
+        
+        with open(caption, 'r') as f:
+            self.caption = json.load(f)
+        
         self.size = (512,512)
         self.clip_size = (224,224)
         self.dynamic = 2
 
     def __len__(self):
-        return 40000
-
+        return 10000
+    
     def check_region_size(self, image, yyxx, ratio, mode = 'max'):
         pass_flag = True
         H,W = image.shape[0], image.shape[1]
@@ -41,9 +45,12 @@ class MVImageNetDataset(BaseDataset):
         return mask
         
     def get_sample(self, idx):
-        object_dir = self.data[idx].replace('./', self.image_dir) 
+        object_dir = self.data[idx].replace('./', self.image_dir)
+        _object_dir = os.path.dirname(object_dir)
+        caption = self.load_caption(_object_dir)
+        
         frames = os.listdir(object_dir)
-        frames = [ i for i in frames if '.png' in i]
+        frames = [i for i in frames if '.png' in i]
 
         # Sampling frames
         min_interval = len(frames)  // 8
@@ -76,6 +83,9 @@ class MVImageNetDataset(BaseDataset):
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()
         item_with_collage['time_steps'] = sampled_time_steps
+        item_with_collage['caption'] = caption
+        item_with_collage['img_path'] = tar_image_path
+        # item_with_collage['video_id'] = os.path.dirname(object_dir)
 
         return item_with_collage
 
