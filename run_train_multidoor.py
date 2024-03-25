@@ -1,25 +1,14 @@
 import pytorch_lightning as pl
-from torch.utils.data import DataLoader
-from datasetsv2.ytb_vos import YoutubeVOSDataset
-from datasetsv2.ytb_vis import YoutubeVISDataset
-from datasetsv2.saliency_modular import SaliencyDataset
-from datasetsv2.vipseg import VIPSegDataset
-from datasetsv2.mvimagenet import MVImageNetDataset
-from datasetsv2.sam import SAMDataset
-from datasetsv2.uvo import UVODataset
-from datasetsv2.uvo_val import UVOValDataset
-from datasetsv2.mose import MoseDataset
-from datasetsv2.vitonhd import VitonHDDataset
-from datasetsv2.fashiontryon import FashionTryonDataset
-from datasetsv2.lvis import LvisDataset
-from datasetsv2.coco import CocoDataset
-from datasetsv2.hico import HICODataset
+from datasets.hico import HICODataset
+from datasets.psg import PSGDataset
+from datasets.pvsg import PVSGDataset
+from datasets.vg import VGDataset
 from cldm.logger import ImageLogger
 from cldm.model import create_model, load_state_dict
+from torch.utils.data import DataLoader
 from torch.utils.data import ConcatDataset
 from cldm.hack import disable_verbosity, enable_sliced_attention
 from omegaconf import OmegaConf
-from pytorch_lightning.callbacks import ModelCheckpoint
 
 save_memory = False
 disable_verbosity()
@@ -27,13 +16,13 @@ if save_memory:
     enable_sliced_attention()
 
 # Configs
-resume_path = 'checkpoints/anydoor_ini.ckpt'
+resume_path = 'lightning_logs/version_5/checkpoints/epoch=11-step=104999.ckpt'
 batch_size = 4
 logger_freq = 2000
 learning_rate = 1e-5
 sd_locked = False
 only_mid_control = False
-n_gpus = 2
+n_gpus = 4
 accumulate_grad_batches = 1
 max_epochs = 12
 
@@ -44,33 +33,19 @@ model.learning_rate = learning_rate
 model.sd_locked = sd_locked
 model.only_mid_control = only_mid_control
 
-# datasetsv2
+# datasets
 DConf = OmegaConf.load('./configs/datasets.yaml')
-dataset1 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)  
-# dataset2 =  SaliencyDataset(**DConf.Train.Saliency) 
-dataset3 = VIPSegDataset(**DConf.Train.VIPSeg) 
-dataset4 = YoutubeVISDataset(**DConf.Train.YoutubeVIS) 
-# dataset5 = MVImageNetDataset(**DConf.Train.MVImageNet)
-# dataset6 = SAMDataset(**DConf.Train.SAM)
-# dataset7 = UVODataset(**DConf.Train.UVO.train)
-# dataset8 = VitonHDDataset(**DConf.Train.VitonHD)
-# dataset9 = UVOValDataset(**DConf.Train.UVO.val)
-# dataset10 = MoseDataset(**DConf.Train.Mose)
-# dataset11 = FashionTryonDataset(**DConf.Train.FashionTryon)
-# dataset12 = LvisDataset(**DConf.Train.Lvis)
-dataset13 = CocoDataset(**DConf.Train.COCO)
-# dataset14 = HICODataset(**DConf.Train.HICO)
+dataset1 = HICODataset(**DConf.Train.HICO)
+dataset2 = PSGDataset(**DConf.Train.PSG)
+dataset3 = PVSGDataset(**DConf.Train.PVSG)
 
-# image_data = [dataset6, dataset8, dataset12, dataset13]
-# video_data = [dataset1, dataset3, dataset4, dataset7, dataset10]
-image_data = [dataset13]
-video_data = [dataset1, dataset3, dataset4]
+image_data = [dataset1, dataset2]
+video_data = [dataset3]
 
 # The ratio of each dataset is adjusted by setting the __len__ 
-dataset = ConcatDataset(image_data + video_data + video_data)
+dataset = ConcatDataset(image_data + video_data)
 dataloader = DataLoader(dataset, num_workers=8, batch_size=batch_size, shuffle=True)
-logger = ImageLogger(batch_frequency=logger_freq, split='anydoor_init')
-
+logger = ImageLogger(batch_frequency=logger_freq, split="psg_train")
 trainer = pl.Trainer(
     gpus=n_gpus,
     strategy="ddp",

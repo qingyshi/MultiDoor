@@ -1,4 +1,4 @@
-from ldm.models.diffusion.ddpm import LatentDiffusion
+from .cldm import ControlLDM
 from ldm.util import instantiate_from_config
 import torch
 from torch import nn
@@ -6,46 +6,43 @@ from einops import rearrange, repeat
 from torchvision.utils import make_grid     
         
 
-class MultiAdapter(LatentDiffusion):
-    def __init__(self, only_mid_control, ref_img_key, img_cond_config, *args, **kwargs):
+class MultiAdapter(ControlLDM):
+    def __init__(self, ref_img_key, img_cond_config, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.img_encoder = instantiate_from_config(img_cond_config)
-        self.only_mid_control = only_mid_control
         self.ref_img_key = ref_img_key
     
     def get_input(self, batch, k, bs=None, *args, **kwargs):
-        x, cond = super().get_input(batch, self.first_stage_key, 
-                                    *args, **kwargs)
+        x, cond = super().get_input(batch, k, bs, *args, **kwargs)
         # cond['c_crossattn'].shape: (b, 77, 1024)
         ref_image = batch[self.ref_img_key] # ref_image.shape: (b, n, 224, 224, 3)
-        img_token = self.img_encoder(ref_image) # img_token.shape: (b, n * 256, 1024)
-        self.time_steps = batch['time_steps']
-        c = dict(c_crossattn=cond, img_token=img_token)
-        return x, c
+        img_token = self.img_encoder(ref_image) # img_token.shape: (b, n * 257, 1024)
+        cond['img_token'] = [img_token]
+        return x, cond
     
     def apply_model(self, x_noisy, t, cond, *args, **kwargs):
         assert isinstance(cond, dict)
         diffusion_model = self.model.diffusion_model
-        cond_text = cond['c_crossattn']
-        cond_subject = cond['img_token']
-        eps = diffusion_model(x=x_noisy, timesteps=t, subject=cond_subject, caption=cond_text, 
-                              control=None, only_mid_control=self.only_mid_control)
+
+        cond_text = torch.cat(cond['c_crossattn'], dim=1)
+        cond_subject = torch.cat(cond['img_token'], dim=1)
+
+        if cond['c_concat'] is None:
+            eps = diffusion_model(x=x_noisy, timesteps=t, subject=cond_subject, caption=cond_text, control=None, only_mid_control=self.only_mid_control)
+        else:
+            control = self.control_model(x=x_noisy, hint=torch.cat(cond['c_concat'], 1), timesteps=t, context=cond_subject)
+            control = [c * scale for c, scale in zip(control, self.control_scales)]
+            eps = diffusion_model(x=x_noisy, timesteps=t, caption=cond_text, subject=cond_subject, control=control, only_mid_control=self.only_mid_control)
         return eps
     
     def configure_optimizers(self):
         lr = self.learning_rate
-        num_params = 0
-        params = []
+        params = list(self.control_model.parameters())
         params += list(self.img_encoder.projector.parameters())
-        params.append(self.img_encoder.sub_obj_emb)
-        for name, param in self.model.diffusion_model.named_parameters():
-            if 'transformer_blocks' in name and 'fuser' in name:
-                param.requires_grad_(True)
-                params.append(param)
+        params += list(self.model.diffusion_model.output_blocks.parameters())
+        params += list(self.model.diffusion_model.out.parameters())
+        params.append(self.img_encoder.obj_emb)
         opt = torch.optim.AdamW(params, lr=lr)
-        for param in params:
-            num_params += param.numel()
-        print(f"params in opt: {num_params}")
         return opt
     
     @torch.no_grad()
@@ -58,10 +55,17 @@ class MultiAdapter(LatentDiffusion):
 
         log = dict()
         z, c = self.get_input(batch, self.first_stage_key, bs=N)
-        c, ref = c["c_crossattn"][:N], c['img_token'][:N]
+        c_cat, c, ref = c["c_concat"][0][:N], c["c_crossattn"][0][:N], c['img_token'][0][:N]
         N = min(z.shape[0], N)
         n_row = min(z.shape[0], n_row)
         log["reconstruction"] = self.decode_first_stage(z) 
+
+        # ==== visualize the shape mask or the high-frequency map ====
+        guide_mask = (c_cat[:, -1, :, :].unsqueeze(1) + 1) * 0.5
+        guide_mask = torch.cat([guide_mask, guide_mask, guide_mask], 1)
+        HF_map  = c_cat[:, :3, :, :]  # * 2.0 - 1.0
+
+        log["control"] = HF_map
 
         cond_image = batch[self.ref_img_key][:N].clone()    # (b, 2, 224, 224, 3)
         cond_image = torch.cat([cond_image[:, i, ...] for i in range(cond_image.shape[1])], dim=2)
@@ -86,7 +90,7 @@ class MultiAdapter(LatentDiffusion):
 
         if sample:
             # get denoise row
-            samples, z_denoise_row = self.sample_log(cond={"c_crossattn": [c], "img_token": [ref]},
+            samples, z_denoise_row = self.sample_log(cond={"c_concat": [c_cat], "c_crossattn": [c], "img_token": [ref]},
                                                      batch_size=N, ddim=use_ddim,
                                                      ddim_steps=ddim_steps, eta=ddim_eta)
             x_samples = self.decode_first_stage(samples)
@@ -97,8 +101,9 @@ class MultiAdapter(LatentDiffusion):
 
         if unconditional_guidance_scale > 1.0:
             uc_cross = self.get_unconditional_conditioning(N)
-            uc_full = {"c_crossattn": [c], "img_token": [uc_cross]}
-            samples_cfg, _ = self.sample_log(cond={"c_crossattn": [c], "img_token": [ref]},
+            uc_cat = c_cat  # torch.zeros_like(c_cat)
+            uc_full = {"c_concat": [uc_cat], "c_crossattn": [c], "img_token": [uc_cross]}
+            samples_cfg, _ = self.sample_log(cond={"c_concat": [c_cat], "c_crossattn": [c], "img_token": [ref]},
                                              batch_size=N, ddim=use_ddim,
                                              ddim_steps=ddim_steps, eta=ddim_eta,
                                              unconditional_guidance_scale=unconditional_guidance_scale,
@@ -110,5 +115,6 @@ class MultiAdapter(LatentDiffusion):
     
     @torch.no_grad()
     def get_unconditional_conditioning(self, B):
-        uncond = torch.zeros((B, 512, 1024)).to('cuda')
+        uncond = torch.zeros((B, 2, 224, 224, 3)).to('cuda')
+        uncond = self.img_encoder(uncond)
         return uncond

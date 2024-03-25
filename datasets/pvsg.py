@@ -7,14 +7,23 @@ from .base import BaseDataset
 
 
 class PVSGDataset(BaseDataset):
-    def __init__(self, data_root):
+    def __init__(self, data_root="/data00/OpenPVSG/data"):
         self.data_root = data_root
         with open(os.path.join(data_root, 'pvsg.json'), 'r') as f:
             anno = json.load(f)
         self.anno = anno
         self.data = anno['data']
-        self.dynamic = 1
+        '''
+         Dynamic:
+            0: Static View, High Quality
+            1: Multi-view, Low Quality
+            2: Multi-view, High Quality
+        '''
+        self.dynamic = 2
 
+    def __len__(self):
+        return 40000
+    
     def get_sample(self, index):
         data = self.data[index]
         video_id = data['video_id']

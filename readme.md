@@ -46,34 +46,118 @@ pip install lvis
 
 ### Download checkpoints
 
-Download DINOv2 checkpoint and revise `./configs/multidoor.yaml` for the path (line 84).
+Download DINOv2 checkpoint and revise `./configs/multidoor.yaml` for the path (line 85).
 * URL: https://github.com/facebookresearch/dinov2?tab=readme-ov-file
 
-Download CLIP-ViT-H-14 and revise `./configs/multidoor.yaml` for the path (line 89).
+Download CLIP-ViT-H-14 and revise `./configs/multidoor.yaml` for the path (line 90).
 * URL: https://huggingface.co/laion/CLIP-ViT-H-14-laion2B-s32B-b79K/tree/main
 
-Download Stable Diffusion V2.1 base for training from scratch.
-* URL: https://huggingface.co/stabilityai/stable-diffusion-2-1-base/tree/main
+Download AnyDoor checkpoint.
+* URL: https://huggingface.co/spaces/xichenhku/AnyDoor/tree/main
 
 ### Convert checkpoints for initialization
 
 If your would like to train from scratch, convert the downloaded checkpoints to control copy by running:
 ```bash
-sh ./scripts/convert_weight.sh  
+python tool_add_fuser_sd21.py /path/to/AnyDoor/checkpoint/epoch=1-step=8687.ckpt ./checkpoints/anydoor_ini.ckpt
 ```
-There will be a checkpoint at `./checkpoints/control_sd21_ini.ckpt`
+There will be a checkpoint at `./checkpoints/anydoor_ini.ckpt`
 
 ### Prepare the datasets
 
-* download datasets and revise `./configs/datasetsv2.yaml` for the path
-* You could prepare you own datasets according to the formates of files in `./datasetsv2`.
-* If you use UVO dataset, you need to process the json following `./datasetsv2/Preprocess/uvo_process.py`
-* You could refer to `run_datasetv2_debug.py` to verify you data is correct.
+First download datasets from https://huggingface.co/datasets/QingyuShi/MultiDoor-Dataset/tree/main and save all the files in one directory `./data`
+
+```text
+data/
+├── ego4d_masks.zip
+├── ego4d_videos.zip
+├── epic_kitchen_masks.zip
+├── epic_kitchen_videos.zip
+├── vidor_masks.zip
+├── vidor_videos.zip
+├── pvsg.json
+├── psg.json
+├── hicodet.zip
+├── relationships.zip
+```
+
+
+#### PVSG dataset
+Following the [pvsg](https://github.com/LilyDaytoy/OpenPVSG) dataset:
+
+```bash
+cd path/to/data
+git clone git@github.com:LilyDaytoy/OpenPVSG.git
+cd OpenPVSG
+mkdir data_zip && cd data_zip
+mkdir Ego4D EpicKitchen VidOR
+mv ../../ego4d_masks.zip Ego4D/ego4d_videos.zip
+mv ../../ego4d_videos.zip Ego4D/ego4d_videos.zip
+mv ../../epic_kitchen_masks.zip EpicKitchen/epic_kitchen_masks.zip
+mv ../../epic_kitchen_videos.zip EpicKitchen/epic_kitchen_videos.zip
+mv ../../vidor_masks.zip VidOR/vidor_masks.zip
+mv ../../vidor_videos.zip VidOR/vidor_videos.zip
+mv ../../pvsg.json pvsg.json
+cd .. && python tools/unzip_and_extract.py
+```
+
+#### PSG dataset
+
+Only need to prepare the coco2017 dataset
+
+#### HICO dataset
+
+```bash
+cd path/to/data
+unzip hicodet.zip
+unzip relationships.zip && mv relationships ./hicodet/relationships
+```
+
+* revise `./configs/datasets.yaml` for the path(only line74, line80, line81, line84).
+* You could prepare you own datasets according to the formates of files in `./datasets`.
+* If you use UVO dataset, you need to process the json following `./datasets/Preprocess/uvo_process.py`
+* You could refer to `run_dataset_debug.py` to verify you data is correct.
+
+## data directory's structure:
+```
+data/
+├── OpenPVSG
+|   ├── data
+|   |   ├── ego4d
+|   |   │   ├── frames
+|   |   │   ├── masks
+|   |   │   └── videos
+|   |   ├── epic_kitchen
+|   |   │   ├── frames
+|   |   │   ├── masks
+|   |   │   └── videos
+|   |   ├── vidor
+|   |   │   ├── frames
+|   |   │   ├── masks
+|   |   │   └── videos
+|   |   └── pvsg.json
+|   ├── data_zip
+|   |   ├── Ego4D
+|   |   │   ├── ego4d_masks.zip
+|   |   │   └── ego4d_videos.zip
+|   |   ├── EpicKitchen
+|   |   │   ├── epic_kitchen_masks.zip
+|   |   │   └── epic_kitchen_videos.zip
+|   |   ├── VidOR
+|   |   │   ├── vidor_masks.zip
+|   |   │   └── vidor_videos.zip
+|   |   └── pvsg.json
+|   └── something else
+├── psg.json
+└── hicodet
+    ├── something else
+    └── relationships
+```
 
 ### Start training
 
 ```bash
-sh ./scripts/train.sh
+python run_train_multidoor.py
 ```
 
 

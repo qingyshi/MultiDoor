@@ -1,5 +1,5 @@
 model:
-  target: cldm.multidoor.MultiDoor
+  target: cldm.multiadapter.MultiAdapter
   params:
     linear_start: 0.00085
     linear_end: 0.0120
@@ -81,7 +81,7 @@ model:
           target: torch.nn.Identity
 
     img_cond_config:
-      target: ldm.modules.encoders.modules.FrozenDinoV2Encoder
+      target: ldm.modules.encoders.modules.FrozenMultiDoorEncoder
       weight: /data00/sqy/checkpoints/dinov2/dinov2_vitg14_pretrain.pth
     
     cond_stage_config:

@@ -395,15 +395,20 @@ def inference_single_image(ref_image, ref_mask, tar_image, tar_mask, caption, gu
 
 if __name__ == '__main__': 
     # ==== Example for inferring a single image ===
-    name = 'dog'
-    reference_image_path = ['examples/' + name + '/ref1.jpg', 'examples/' + name + '/ref2.jpg'] if os.path.exists('examples/' + name + '/ref1.jpg') else 'examples/' + name + '/ref.jpg'
-    reference_mask_path = ['examples/' + name + '/0.png', 'examples/' + name + '/1.png']
-    bg_image_path = 'examples/' + name + '/scene.jpg'
-    bg_mask_path = ['examples/' + name + '/tar01.png', 'examples/' + name + '/tar02.png']
-    # bg_image_path = 'examples/TestDreamBooth/BG/000000047948_GT.png'
-    # bg_mask_path = ['examples/TestDreamBooth/BG/000000047948_mask.png', 'examples/TestDreamBooth/BG/000000309203_mask.png']
-    save_path = 'examples/' + name + '/gen_res.png'
-    caption = ['Two golden retrievers are playing with each other on the road, they looks very happy.']
+    reference_image_path = ['examples/dataset/dog/01.jpg', 'examples/dataset/pink_sunglasses/03.jpg']
+    reference_mask_path = [ref_image_path.replace('jpg', 'png') for ref_image_path in reference_image_path]
+    bg_image_path = 'examples/background/00/00.png'
+    bg_mask_path = [bg_image_path.replace("00.png", "mask_0.png"), bg_image_path.replace("00.png", "mask_1.png")]
+    start = 0
+    while True:
+        save_path = os.path.join(os.path.dirname(bg_image_path), "GEN", f"{start}.png")
+        if os.path.exists(save_path):
+            start += 1
+        else:
+            break
+    if not os.path.exists(os.path.dirname(save_path)):
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    caption = ['The dog is wearing the sunglasses.']
 
     # reference image + reference mask
     # You could use the demo of SAM to extract RGB-A image with masks

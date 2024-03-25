@@ -23,7 +23,7 @@ class HICODataset(BaseDataset):
         self.dynamic = 0
     
     def __len__(self):
-        return 40000
+        return 20000
     
     def sample_timestep(self, max_step=1000):
         step_start = 0

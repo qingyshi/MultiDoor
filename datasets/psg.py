@@ -17,6 +17,9 @@ class PSGDataset(BaseDataset):
         self.id2predicate: list = self.ann.get('predicate_classes')
         self.id2class: list = self.ann.get('thing_classes')
         self.dynamic = 0
+
+    def __len__(self):
+        return 40000
     
     def get_sample(self, index):
         ann = self.data[index]
@@ -51,9 +54,6 @@ class PSGDataset(BaseDataset):
         item_with_collage['img_path'] = image_path
         item_with_collage['caption'] = caption
         return item_with_collage
-
-    def __len__(self):
-        return 40000
     
     def check_isthing(self, relations, segments_info):
         thing_relations = []

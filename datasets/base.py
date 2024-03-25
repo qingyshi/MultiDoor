@@ -130,13 +130,13 @@ class BaseDataset(Dataset):
         # if mkdata:
         #     return {}
         
-        # if isinstance(ref_mask, np.ndarray) or len(ref_mask) == 1:
-        #     if isinstance(ref_mask, list):
-        #         ref_mask, tar_mask = ref_mask[0], tar_mask[0]
-        #     item = self.process_single_pair(ref_image, ref_mask, tar_image, tar_mask)
-        #     null_ref_image = np.zeros_like(item['ref'])
-        #     item['ref'] = np.stack([item['ref'], null_ref_image], axis=0)
-        #     return item
+        if isinstance(ref_mask, np.ndarray) or len(ref_mask) == 1:
+            if isinstance(ref_mask, list):
+                ref_mask, tar_mask = ref_mask[0], tar_mask[0]
+            item = self.process_single_pair(ref_image, ref_mask, tar_image, tar_mask)
+            null_ref_image = np.zeros_like(item['ref'])
+            item['ref'] = np.stack([item['ref'], null_ref_image], axis=0)
+            return item
         
         # Get the outline Box of the reference image
         multi_subject_ref_image = []
@@ -176,7 +176,8 @@ class BaseDataset(Dataset):
         masked_ref_image_compose = np.stack(multi_subject_ref_image, axis=0)
         masked_ref_image_aug = masked_ref_image_compose.copy() # as ref image, shape: (2, 224, 244, 3)
         # Getting for high-freqency map
-        multi_ref_image_collage = [sobel(masked_ref_image_compose, ref_mask_compose / 255) for masked_ref_image_compose, ref_mask_compose in 
+        multi_ref_image_collage = [sobel(masked_ref_image_compose, ref_mask_compose / 255) 
+                                        for masked_ref_image_compose, ref_mask_compose in 
                                         zip(multi_subject_ref_image, multi_subject_ref_mask)]
 
 

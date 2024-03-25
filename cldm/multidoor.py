@@ -1,11 +1,8 @@
 from .cldm import ControlLDM
 from ldm.util import instantiate_from_config
-from ldm.modules.encoders.modules import AbstractEncoder
 import torch
-from torch import nn
 from einops import rearrange, repeat
-from torchvision.utils import make_grid
-from diffusers import StableDiffusionPipeline        
+from torchvision.utils import make_grid     
         
 
 class MultiDoor(ControlLDM):
