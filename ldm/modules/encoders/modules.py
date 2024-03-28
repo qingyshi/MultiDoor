@@ -364,7 +364,7 @@ class FrozenMultiDoorEncoder(AbstractEncoder):
         Input:
             image: multiple reference objects from single image in shape (b, n, h, w, c)
         Output:
-            ref_token: reference tokens in shape (b, n, 257, 1024)
+            ref_token: reference tokens in shape (b, n * 257, 1024)
         """
         
         if len(image.shape) == 5:

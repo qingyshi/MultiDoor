@@ -8,13 +8,14 @@ import torchvision.transforms.functional as F
 from .base import BaseDataset
 
 
-class CocoDataset(BaseDataset):
-    def __init__(self, root, annotation, caption, transforms=None):
+class CocoValDataset(BaseDataset):
+    def __init__(self, root, annotation, transforms=None):
         self.root = root
         self.coco = COCO(annotation)
-        self.data = list(sorted(self.coco.imgs.keys())) 
-        with open(caption) as f:
-            self.caption = json.load(f)
+        self.data = list(sorted(self.coco.imgs.keys()))
+        
+        # with open(caption) as f:
+        #     self.caption = json.load(f)
         
         self.transforms = transforms
         self.cat_to_names = {cat_id: cat['name'] for cat_id, cat in self.coco.cats.items()}
@@ -22,22 +23,25 @@ class CocoDataset(BaseDataset):
     
     def get_sample(self, index):
         coco = self.coco
-        img_id = self.data[index]        
+        img_id = self.data[index]
         ann_ids = coco.getAnnIds(imgIds=img_id)
         coco_annotation = coco.loadAnns(ann_ids)
         path = coco.loadImgs(img_id)[0]['file_name']
-        caption, chosen_objs = self.load_caption(path)
         image_path = os.path.join(self.root, path)
         img = np.array(Image.open(image_path).convert("RGB"))
 
-        # num_objs = len(coco_annotation)
-        # if num_objs >= 2:
-        #     chosen_objs: np.ndarray = np.random.choice(list(range(num_objs)), 2, replace=False)
-        # else:
-        #     raise Exception
+        num_objs = len(coco_annotation)
+
+        masks = []
+        
+        if num_objs >= 2:
+            chosen_objs = np.random.choice(list(range(num_objs)), 2, replace=False)
+        elif num_objs == 1:
+            chosen_objs = [0]
+        else:
+            raise Exception
         
         names = []
-        masks = []
         for i, idx in enumerate(chosen_objs):
             ann = coco_annotation[idx]
             if 'segmentation' in ann:
@@ -46,17 +50,20 @@ class CocoDataset(BaseDataset):
             else:
                 masks.append(np.zeros((img.height, img.width)))
             names.append(self.cat_to_names[ann['category_id']])
-        assert len(names) == 2
+
+        caption = " and ".join(names)
+        if len(names) == 1:
+            caption = caption + 'and nothing'
+        # labels = torch.tensor([ann['category_id'] for ann in coco_annotation], dtype=torch.int64)
         item_with_collage = self.process_pairs(ref_image=img, ref_mask=masks, 
                                                tar_image=img.copy(), tar_mask=masks.copy())
         sampled_time_steps = self.sample_timestep()
         
         item_with_collage['time_steps'] = sampled_time_steps
-        # item_with_collage['chosen_objs'] = chosen_objs.tolist()
         # item_with_collage['names'] = names
-        # item_with_collage['image_path'] = image_path
+        item_with_collage['img_path'] = image_path
         item_with_collage['caption'] = caption
         return item_with_collage
 
     def __len__(self):
-        return 40000
+        return len(self.data)

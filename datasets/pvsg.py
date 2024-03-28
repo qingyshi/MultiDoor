@@ -73,7 +73,7 @@ class PVSGDataset(BaseDataset):
         sampled_time_steps = self.sample_timestep()
         
         item_with_collage['time_steps'] = sampled_time_steps
-        item_with_collage['img_path'] = tar_image_path
+        # item_with_collage['image_path'] = tar_image_path
         item_with_collage['caption'] = caption
         return item_with_collage
         

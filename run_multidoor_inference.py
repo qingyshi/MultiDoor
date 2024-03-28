@@ -395,94 +395,57 @@ def inference_single_image(ref_image, ref_mask, tar_image, tar_mask, caption, gu
 
 if __name__ == '__main__': 
     # ==== Example for inferring a single image ===
-    reference_image_path = ['examples/dataset/dog/01.jpg', 'examples/dataset/pink_sunglasses/03.jpg']
-    reference_mask_path = [ref_image_path.replace('jpg', 'png') for ref_image_path in reference_image_path]
-    bg_image_path = 'examples/background/00/00.png'
-    bg_mask_path = [bg_image_path.replace("00.png", "mask_0.png"), bg_image_path.replace("00.png", "mask_1.png")]
+    # reference_image_path = ['examples/dataset/dog/01.jpg', 'examples/dataset/pink_sunglasses/03.jpg']
+    # reference_mask_path = [ref_image_path.replace('jpg', 'png') for ref_image_path in reference_image_path]
+    # bg_image_path = 'examples/background/00/00.png'
+    # bg_mask_path = [bg_image_path.replace("00.png", "mask_0.png"), bg_image_path.replace("00.png", "mask_1.png")]
+    reference_image_path = 'examples/custom/board/ref.jpg'
+    reference_mask_path = ['examples/custom/board/0.png', 'examples/custom/board/1.png']
+    bg_image_path = 'examples/custom/board/scene.jpg'
+    bg_mask_path = ['examples/custom/board/tar01.png', 'examples/custom/board/tar02.png']
     start = 0
     while True:
-        save_path = os.path.join(os.path.dirname(bg_image_path), "GEN", f"{start}.png")
-        if os.path.exists(save_path):
-            start += 1
+        while True:
+            save_path = os.path.join(os.path.dirname(bg_image_path), "GEN", f"{start}.png")
+            if os.path.exists(save_path):
+                start += 1
+            else:
+                break
+        if not os.path.exists(os.path.dirname(save_path)):
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        caption = ['The man is riding a skateboard.']
+
+        # reference image + reference mask
+        # You could use the demo of SAM to extract RGB-A image with masks
+        # https://segment-anything.com/demo
+        if isinstance(reference_image_path, list):
+            image = [cv2.cvtColor(cv2.imread(ref_image_path), cv2.COLOR_BGR2RGB) for ref_image_path in reference_image_path]
         else:
-            break
-    if not os.path.exists(os.path.dirname(save_path)):
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    caption = ['The dog is wearing the sunglasses.']
+            image = cv2.cvtColor(cv2.imread(reference_image_path), cv2.COLOR_BGR2RGB)
+        mask = [np.array(Image.open(file).convert('L')) == 255 for file in reference_mask_path]
+        ref_image = image 
+        ref_mask = mask
 
-    # reference image + reference mask
-    # You could use the demo of SAM to extract RGB-A image with masks
-    # https://segment-anything.com/demo
-    if isinstance(reference_image_path, list):
-        image = [cv2.cvtColor(cv2.imread(ref_image_path), cv2.COLOR_BGR2RGB) for ref_image_path in reference_image_path]
-    else:
-        image = cv2.cvtColor(cv2.imread(reference_image_path), cv2.COLOR_BGR2RGB)
-    mask = [np.array(Image.open(file).convert('L')) == 255 for file in reference_mask_path]
-    ref_image = image 
-    ref_mask = mask
+        # background image
+        back_image = cv2.imread(bg_image_path).astype(np.uint8)
+        back_image = cv2.cvtColor(back_image, cv2.COLOR_BGR2RGB)
 
-    # background image
-    back_image = cv2.imread(bg_image_path).astype(np.uint8)
-    back_image = cv2.cvtColor(back_image, cv2.COLOR_BGR2RGB)
-
-    # background mask 
-    tar_mask = [np.array(Image.open(file).convert('L')) == 255 for file in bg_mask_path]
-    tar_mask = np.stack(tar_mask, axis=0).astype(np.uint8)
-    
-    gen_image, hint = inference_single_image(ref_image, ref_mask, back_image.copy(), tar_mask, caption)
-    h, w = back_image.shape[0], back_image.shape[1]
-    hint = cv2.resize(hint, (w, h))
-    hint = hint[:, :, :-1] * 127.5 + 127.5
-    hint = hint.astype(np.uint8)
-    if isinstance(ref_image, list):
-        ref_image = [cv2.resize(ref, (w, h)) for ref in ref_image]
-        vis_image = cv2.hconcat([ref_image[0], ref_image[1], back_image, hint, gen_image])
-    else:
-        ref_image = cv2.resize(ref_image, (w, h))
-        tar_mask = [cv2.resize(tar_m, (w, h)) for tar_m in tar_mask]
-        vis_image = cv2.hconcat([ref_image, back_image, hint, gen_image])
-    
-    cv2.imwrite(save_path, vis_image [:, :, ::-1])
-    print('finish!')
-    #'''
-    #'''
-    # ==== Example for inferring VITON-HD Test dataset ===
-
-    # from omegaconf import OmegaConf
-    # import os 
-    # DConf = OmegaConf.load('./configs/datasets.yaml')
-    # save_dir = './VITONGEN'
-    # if not os.path.exists(save_dir):
-    #     os.mkdir(save_dir)
-
-    # test_dir = DConf.Test.VitonHDTest.image_dir
-    # image_names = os.listdir(test_dir)
-    
-    # for image_name in image_names:
-    #     ref_image_path = os.path.join(test_dir, image_name)
-    #     tar_image_path = ref_image_path.replace('/cloth/', '/image/')
-    #     ref_mask_path = ref_image_path.replace('/cloth/','/cloth-mask/')
-    #     tar_mask_path = ref_image_path.replace('/cloth/', '/image-parse-v3/').replace('.jpg','.png')
-
-    #     ref_image = cv2.imread(ref_image_path)
-    #     ref_image = cv2.cvtColor(ref_image, cv2.COLOR_BGR2RGB)
-
-    #     gt_image = cv2.imread(tar_image_path)
-    #     gt_image = cv2.cvtColor(gt_image, cv2.COLOR_BGR2RGB)
-
-    #     ref_mask = (cv2.imread(ref_mask_path) > 128).astype(np.uint8)[:, :, 0]
-
-    #     tar_mask = Image.open(tar_mask_path ).convert('P')
-    #     tar_mask = np.array(tar_mask)
-    #     tar_mask = tar_mask == 5
-
-    #     gen_image = inference_single_image(ref_image, ref_mask, gt_image.copy(), tar_mask)
-    #     gen_path = os.path.join(save_dir, image_name)
-
-    #     vis_image = cv2.hconcat([ref_image, gt_image, gen_image])
-    #     cv2.imwrite(gen_path, vis_image[:, :, ::-1])
-    #'''
-
-    
-    
-
+        # background mask 
+        tar_mask = [np.array(Image.open(file).convert('L')) == 255 for file in bg_mask_path]
+        tar_mask = np.stack(tar_mask, axis=0).astype(np.uint8)
+        
+        gen_image, hint = inference_single_image(ref_image, ref_mask, back_image.copy(), tar_mask, caption)
+        h, w = back_image.shape[0], back_image.shape[1]
+        hint = cv2.resize(hint, (w, h))
+        hint = hint[:, :, :-1] * 127.5 + 127.5
+        hint = hint.astype(np.uint8)
+        if isinstance(ref_image, list):
+            ref_image = [cv2.resize(ref, (w, h)) for ref in ref_image]
+            vis_image = cv2.hconcat([ref_image[0], ref_image[1], back_image, hint, gen_image])
+        else:
+            ref_image = cv2.resize(ref_image, (w, h))
+            tar_mask = [cv2.resize(tar_m, (w, h)) for tar_m in tar_mask]
+            vis_image = cv2.hconcat([ref_image, back_image, hint, gen_image])
+        
+        cv2.imwrite(save_path, vis_image [:, :, ::-1])
+        print('finish!')

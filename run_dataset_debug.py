@@ -15,6 +15,7 @@ from datasets.coco import CocoDataset
 from datasets.hico import HICODataset
 from datasets.psg import PSGDataset
 from datasets.pvsg import PVSGDataset
+from datasets.ytb_vis import YoutubeVIS21Dataset
 from datasets.vg import VGDataset
 from torch.utils.data import ConcatDataset
 from torch.utils.data import DataLoader
@@ -41,12 +42,13 @@ DConf = OmegaConf.load('./configs/datasets.yaml')
 # dataset14 = HICODataset(**DConf.Train.HICO)
 # dataset15 = PSGDataset()
 # dataset16 = PVSGDataset(data_root="/data00/OpenPVSG/data")
-dataset17 = VGDataset()
+# dataset17 = VGDataset()
+dataset18 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
 
 # image_data = [dataset12]
 # video_data = [dataset1, dataset3, dataset4]
 # dataset = ConcatDataset(image_data + video_data + video_data)
-dataset = dataset17
+dataset = dataset18
 
 def vis_sample(item):
     ref = torch.cat([item['ref'][:, i] for i in range(2)], dim=2) * 255
@@ -65,7 +67,6 @@ def vis_sample(item):
     cv2.imwrite('sample_vis.jpg', vis[:, :, ::-1])
     print(item['caption'][0])
 
-print(dataset == None)
 dataloader = DataLoader(dataset, num_workers=8, batch_size=1, shuffle=True)
 print('len dataloader: ', len(dataloader))
 for data in dataloader:

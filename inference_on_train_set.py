@@ -7,7 +7,7 @@ from pytorch_lightning import seed_everything
 from cldm.model import create_model, load_state_dict
 from cldm.ddim_hacked import DDIMSampler
 from cldm.hack import disable_verbosity, enable_sliced_attention
-from cldm.multidoor import MultiDoor
+from cldm.multiadapter import MultiAdapter
 from datasets.data_utils import * 
 cv2.setNumThreads(0)
 cv2.ocl.setUseOpenCL(False)
@@ -15,7 +15,8 @@ import albumentations as A
 from omegaconf import OmegaConf
 from PIL import Image
 import os
-from datasetsv2.coco import CocoDataset
+from datasets.coco import CocoDataset
+from datasets.coco_val import CocoValDataset
 
 
 save_memory = False
@@ -24,13 +25,14 @@ if save_memory:
     enable_sliced_attention()
 
 DConf = OmegaConf.load('./configs/datasets.yaml')
-dataset = CocoDataset(**DConf.Train.COCO)
+# dataset = CocoDataset(**DConf.Train.COCO)
+dataset = CocoValDataset(**DConf.Train.COCOVal)
 
 config = OmegaConf.load('./configs/inference.yaml')
 model_ckpt =  config.pretrained_model
 model_config = config.config_file
 
-model: MultiDoor = create_model(model_config).cpu()
+model: MultiAdapter = create_model(model_config).cpu()
 model.load_state_dict(load_state_dict(model_ckpt, location='cuda'))
 model = model.cuda()
 ddim_sampler = DDIMSampler(model)
@@ -48,20 +50,33 @@ def aug_data_mask(image, mask):
     return transformed_image, transformed_mask
 
 
-def process_pairs(ref_image, ref_mask, tar_image, tar_mask):
+def process_pairs(ref_image, ref_mask, tar_image, tar_mask, max_ratio=0.9, mkdata=False):
+    assert max(mask_score(ref_mask[0]), mask_score(ref_mask[1])) > 0.90
+
     '''
     inputs:
         ref_image: (H, W, 3)
-        ref_mask: (2, H, W)
+        ref_mask: [(H, W), (H, W)]
         tar_image: (H, W, 3)
-        tar_mask: (2, H, W)
-    
-    outputs:
-        ref: (2, 224, 224, 3)
+        tar_mask: [(H, W), (H, W)]
         
+    outputs:
+        masked_ref_image_aug: (2, 224, 224, 3)
+        cropped_target_image: (512, 512, 3)
+        collage: (512, 512, 4)
     '''
-    # ========= Reference ===========
-        # Get the outline Box of the reference image
+    # if mkdata:
+    #     return {}
+    
+    # if isinstance(ref_mask, np.ndarray) or len(ref_mask) == 1:
+    #     if isinstance(ref_mask, list):
+    #         ref_mask, tar_mask = ref_mask[0], tar_mask[0]
+    #     item = self.process_single_pair(ref_image, ref_mask, tar_image, tar_mask)
+    #     null_ref_image = np.zeros_like(item['ref'])
+    #     item['ref'] = np.stack([item['ref'], null_ref_image], axis=0)
+    #     return item
+    
+    # Get the outline Box of the reference image
     multi_subject_ref_image = []
     multi_subject_ref_mask = []
     
@@ -90,22 +105,19 @@ def process_pairs(ref_image, ref_mask, tar_image, tar_mask):
 
         # Augmenting reference image
         # masked_ref_image_aug = self.aug_data(masked_ref_image) 
-        
-        # Getting for high-freqency map
         masked_ref_image_compose, ref_mask_compose = aug_data_mask(masked_ref_image, single_mask) 
         masked_ref_image_aug = masked_ref_image_compose.copy()
         multi_subject_ref_image.append(masked_ref_image_aug)
         multi_subject_ref_mask.append(ref_mask_compose)
 
-    ref_mask_compose = np.concatenate(multi_subject_ref_mask, axis=1)
-    ref_mask_3 = np.stack([ref_mask_compose, ref_mask_compose, ref_mask_compose], -1)
     masked_ref_image_compose = np.stack(multi_subject_ref_image, axis=0)
-    masked_ref_image_aug = masked_ref_image_compose.copy()  # (2, 224, 244, 3)
-    # ref_image_collage = sobel(masked_ref_image_compose, ref_mask_compose / 255) # (224, 448, 3)
-    multi_ref_image_collage = [sobel(masked_ref_image_compose, ref_mask_compose / 255) for 
-                                masked_ref_image_compose in multi_subject_ref_image]
+    masked_ref_image_aug = masked_ref_image_compose.copy() # as ref image, shape: (2, 224, 244, 3)
+    # Getting for high-freqency map
+    multi_ref_image_collage = [sobel(masked_ref_image_compose, ref_mask_compose / 255) 
+                                    for masked_ref_image_compose, ref_mask_compose in 
+                                    zip(multi_subject_ref_image, multi_subject_ref_mask)]
 
-    
+
 
     # ========= Training Target ===========
     multi_subject_bbox = []
@@ -113,7 +125,7 @@ def process_pairs(ref_image, ref_mask, tar_image, tar_mask):
     
     for single_mask in tar_mask:
         tar_box_yyxx = get_bbox_from_mask(single_mask)
-        tar_box_yyxx = expand_bbox(single_mask, tar_box_yyxx, ratio=[1.1, 1.2]) # 1.1  1.3
+        tar_box_yyxx = expand_bbox(single_mask, tar_box_yyxx, ratio=[1.1, 1.2]) # 1.1, 1.3
         multi_subject_bbox.append(tar_box_yyxx)
         
         # Cropping around the target object 
@@ -121,13 +133,11 @@ def process_pairs(ref_image, ref_mask, tar_image, tar_mask):
         tar_box_yyxx_crop = box2squre(tar_image, tar_box_yyxx_crop) # crop box
         multi_subject_bbox_crop.append(tar_box_yyxx_crop)
     
-    y1, x1 = min([[bbox[0], bbox[2]] for bbox in multi_subject_bbox])
-    y2, x2 = max([[bbox[1], bbox[3]] for bbox in multi_subject_bbox])
-    tar_box_yyxx = (y1, y2, x1, x2)
-    
-    # bbox which contains multi-subjects
-    y1, x1 = min([[bbox[0], bbox[2]] for bbox in multi_subject_bbox_crop])
-    y2, x2 = max([[bbox[1], bbox[3]] for bbox in multi_subject_bbox_crop])
+    # Bbox which contains multi-subjects
+    y1 = min([bbox[0] for bbox in multi_subject_bbox_crop])
+    x1 = min([bbox[2] for bbox in multi_subject_bbox_crop])
+    y2 = max([bbox[1] for bbox in multi_subject_bbox_crop])
+    x2 = max([bbox[3] for bbox in multi_subject_bbox_crop])
     tar_box_yyxx_crop = (y1, y2, x1, x2)
     cropped_target_image = tar_image[y1: y2, x1: x2, :]
     collage = cropped_target_image.copy()
@@ -135,44 +145,55 @@ def process_pairs(ref_image, ref_mask, tar_image, tar_mask):
     tar_mask = np.max(tar_mask, axis=0)
     cropped_tar_mask = tar_mask[y1: y2, x1: x2]
     
+    for single_bbox in multi_subject_bbox:
+        tar_box_yyxx = box_in_box(single_bbox, tar_box_yyxx_crop)
+        y1, y2, x1, x2 = tar_box_yyxx
+        collage[y1: y2, x1: x2, :] = 0
+        
     for single_bbox, ref_image_collage in zip(multi_subject_bbox, multi_ref_image_collage):
         tar_box_yyxx = box_in_box(single_bbox, tar_box_yyxx_crop)
         y1, y2, x1, x2 = tar_box_yyxx
-
+        
         # Prepairing collage image
         ref_image_collage = cv2.resize(ref_image_collage.astype(np.uint8), (x2-x1, y2-y1))
-        ref_mask_compose = cv2.resize(ref_mask_compose.astype(np.uint8), (x2-x1, y2-y1))
-        ref_mask_compose = (ref_mask_compose > 128).astype(np.uint8)
 
         # stitch the hf map into the target image
-        collage[y1: y2, x1: x2, :] = ref_image_collage
+        collage[y1: y2, x1: x2, :] += ref_image_collage
         collage_mask[y1: y2, x1: x2, :] = 1.0
 
+    if np.random.uniform(0, 1) < 0.7: 
+        cropped_tar_mask = perturb_mask(cropped_tar_mask)
+        collage_mask = np.stack([cropped_tar_mask, cropped_tar_mask, cropped_tar_mask], -1)
+
     H1, W1 = collage.shape[0], collage.shape[1]
+
     cropped_target_image = pad_to_square(cropped_target_image, pad_value = 0, random = False).astype(np.uint8)
     collage = pad_to_square(collage, pad_value = 0, random = False).astype(np.uint8)
     collage_mask = pad_to_square(collage_mask, pad_value = 2, random = False).astype(np.uint8)
-    
     H2, W2 = collage.shape[0], collage.shape[1]
+
     cropped_target_image = cv2.resize(cropped_target_image.astype(np.uint8), (512, 512)).astype(np.float32)
     collage = cv2.resize(collage.astype(np.uint8), (512, 512)).astype(np.float32)
     collage_mask = cv2.resize(collage_mask.astype(np.uint8), (512, 512), interpolation = cv2.INTER_NEAREST).astype(np.float32)
+    collage_mask[collage_mask == 2] = -1
     
     # Prepairing dataloader items
     masked_ref_image_aug = masked_ref_image_aug / 255 
     cropped_target_image = cropped_target_image / 127.5 - 1.0
     collage = collage / 127.5 - 1.0 
-    collage = np.concatenate([collage, collage_mask[:, :, :1]] , -1)
-
-    item = dict(ref=masked_ref_image_aug.copy(), 
-                jpg=cropped_target_image.copy(), 
-                hint=collage.copy(), 
-                extra_sizes=np.array([H1, W1, H2, W2]), 
-                tar_box_yyxx_crop=np.array(tar_box_yyxx_crop) ) 
+    collage = np.concatenate([collage, collage_mask[:, :, :1]], -1)
+    
+    item = dict(
+            ref=masked_ref_image_aug.copy(), 
+            jpg=cropped_target_image.copy(), 
+            hint=collage.copy(), 
+            extra_sizes=np.array([H1, W1, H2, W2]), 
+            tar_box_yyxx_crop=np.array(tar_box_yyxx_crop) 
+            ) 
     return item
 
 
-def process_multi_pairs(ref_image, ref_mask, tar_image, tar_mask):
+def process_pairs_from_multi_image(ref_image, ref_mask, tar_image, tar_mask):
     '''
     inputs:
         ref_image: [(H1, W1, 3), (H2, W2, 3)]
@@ -302,24 +323,24 @@ def crop_back(pred, tar_image, extra_sizes, tar_box_yyxx_crop):
     h, w, _ = tar_image.shape
     y2 = min(h, y2)
     x2 = min(w, x2) 
-    pred = cv2.resize(pred, (x2 - x1, y2 - y1))
     m = 5 # maigin_pixel
 
-    # if W1 == H1:
-    #     tar_image[y1+m: y2-m, x1+m: x2-m, :] = pred[m:-m, m:-m]
-    #     return tar_image
+    if W1 == H1:
+        tar_image[y1+m: y2-m, x1+m: x2-m, :] = pred[m:-m, m:-m]
+        return tar_image
 
-    # if W1 < W2:
-    #     pad1 = int((W2 - W1) / 2)
-    #     pad2 = W2 - W1 - pad1
-    #     pred = pred[:,pad1: -pad2, :]
-    # else:
-    #     pad1 = int((H2 - H1) / 2)
-    #     pad2 = H2 - H1 - pad1
-    #     pred = pred[pad1: -pad2, :, :]
+    if W1 < W2:
+        pad1 = int((W2 - W1) / 2)
+        pad2 = W2 - W1 - pad1
+        pred = pred[:,pad1: -pad2, :]
+    else:
+        pad1 = int((H2 - H1) / 2)
+        pad2 = H2 - H1 - pad1
+        pred = pred[pad1: -pad2, :, :]
 
     gen_image = tar_image.copy()
-    gen_image[y1+m: y2-m, x1+m: x2-m, :] =  pred[m:-m, m:-m]
+    pred = cv2.resize(pred, (x2 - x1, y2 - y1))
+    gen_image[y1+m: y2-m, x1+m: x2-m, :] = pred[m:-m, m:-m]
     return gen_image
 
 
@@ -345,18 +366,19 @@ def inference_single_image(item, guidance_scale = 5.0):
     dino_input = torch.from_numpy(ref.copy()).float().cuda() 
     dino_input = torch.stack([dino_input for _ in range(num_samples)], dim=0)
     dino_input = dino_input.clone().to('cuda')
-    ref_token = model.ref_encoder(dino_input)   # (b, 30, 1024)
+    ref_token = model.img_encoder(dino_input)   # (b, n * 257, 1024)
 
     guess_mode = False
     H, W = 512, 512
     
     clip_input = caption * num_samples
-    cond_text = model.get_learned_conditioning(clip_input) # (b, 77, 1024)
-    uncond = model.get_unconditional_conditioning(num_samples) # (b, 77, 1024)
+    cond_text = model.get_learned_conditioning(clip_input)  # (b, 77, 1024)
+    uncond = model.get_unconditional_conditioning(num_samples)  # (b, n * 257, 1024)
     # caption_embedding: (b, 77, 1024)
     
-    cond = {"c_concat": [control], "c_crossattn": [cond_text], "ref_token": [ref_token]}
-    un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [uncond], "ref_token": [ref_token]}
+    cond = {"c_concat": [control], "c_crossattn": [cond_text], "img_token": [ref_token]}
+    un_cond = {"c_concat": None if guess_mode else [control], 
+               "c_crossattn": [cond_text], "img_token": [uncond]}
     shape = (4, H // 8, W // 8)
 
     if save_memory:
@@ -391,14 +413,16 @@ def inference_single_image(item, guidance_scale = 5.0):
     pred = np.clip(pred, 0, 255)[1:, :, :]
     sizes = item['extra_sizes']
     tar_box_yyxx_crop = item['tar_box_yyxx_crop'] 
-    gen_image = crop_back(pred, tar, sizes, tar_box_yyxx_crop) 
-    return gen_image
+    h, w, _ = tar.shape
+    pred = cv2.resize(pred, (w, h))
+    # gen_image = crop_back(pred, tar, sizes, tar_box_yyxx_crop) 
+    return pred
 
 
 if __name__ == '__main__': 
-    count = 0
+    count = 98
     while True:
-        save_path = f'examples/train/visual{count}.jpg'
+        save_path = f'examples/cocoval/visual{count}.jpg'
         data = next(iter(dataset))
         back_image = data['jpg'] * 127.5 + 127.5
         ref_image = data['ref'] * 127.5 + 127.5
@@ -408,7 +432,10 @@ if __name__ == '__main__':
         if len(ref_image) == 2:
             ref_image = [cv2.resize(ref, (w, h)) for ref in ref_image]
             collage = cv2.resize(collage, (w, h))
-            vis_image = cv2.hconcat([ref_image[0].astype(np.float32), ref_image[1].astype(np.float32), collage[:, :, :-1].astype(np.float32), back_image, gen_image])
+            vis_image = cv2.hconcat([ref_image[0].astype(np.float32), 
+                                     ref_image[1].astype(np.float32), 
+                                     collage[:, :, :-1].astype(np.float32), 
+                                     back_image, gen_image])
         else:
             ref_image = cv2.resize(ref_image, (w, h))
             vis_image = cv2.hconcat([ref_image, back_image, gen_image])

@@ -2,7 +2,9 @@ import pytorch_lightning as pl
 from datasets.hico import HICODataset
 from datasets.psg import PSGDataset
 from datasets.pvsg import PVSGDataset
-from datasets.vg import VGDataset
+from datasets.coco import CocoDataset
+from datasets.ytb_vis import YoutubeVIS21Dataset, YoutubeVISDataset
+from datasets.ytb_vos import YoutubeVOSDataset
 from cldm.logger import ImageLogger
 from cldm.model import create_model, load_state_dict
 from torch.utils.data import DataLoader
@@ -16,7 +18,7 @@ if save_memory:
     enable_sliced_attention()
 
 # Configs
-resume_path = 'lightning_logs/version_5/checkpoints/epoch=11-step=104999.ckpt'
+resume_path = '/data00/sqy/checkpoints/anydoor/anydoor_ini.ckpt'
 batch_size = 4
 logger_freq = 2000
 learning_rate = 1e-5
@@ -24,7 +26,7 @@ sd_locked = False
 only_mid_control = False
 n_gpus = 4
 accumulate_grad_batches = 1
-max_epochs = 12
+max_epochs = 24
 
 # First use cpu to load models. Pytorch Lightning will automatically move it to GPUs.
 model = create_model('./configs/multidoor.yaml').cpu()
@@ -37,10 +39,14 @@ model.only_mid_control = only_mid_control
 DConf = OmegaConf.load('./configs/datasets.yaml')
 dataset1 = HICODataset(**DConf.Train.HICO)
 dataset2 = PSGDataset(**DConf.Train.PSG)
-dataset3 = PVSGDataset(**DConf.Train.PVSG)
+dataset3 = CocoDataset(**DConf.Train.COCO)
+dataset4 = PVSGDataset(**DConf.Train.PVSG)
+dataset5 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
+dataset6 = YoutubeVISDataset(**DConf.Train.YoutubeVIS)
+dataset7 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)
 
-image_data = [dataset1, dataset2]
-video_data = [dataset3]
+image_data = [dataset1, dataset2, dataset3]
+video_data = [dataset4, dataset5, dataset6, dataset7]
 
 # The ratio of each dataset is adjusted by setting the __len__ 
 dataset = ConcatDataset(image_data + video_data)

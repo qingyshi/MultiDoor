@@ -75,9 +75,10 @@ class BaseDataset(Dataset):
         if id not in self.caption:
             raise Exception
         else:
-            caption_ann = self.caption[id]
-            caption = caption_ann['caption']
-        return caption
+            anno = self.caption[id]
+            caption = anno['caption']
+            chosen_objs = anno.get('chosen_objs', None)
+        return caption, chosen_objs
     
     def sample_timestep(self, max_step =1000):
         if np.random.rand() < 0.3:

@@ -43,6 +43,7 @@ class ControlledUnetModel(UNetModel):
         h = h.type(x.dtype)
         return self.out(h)
 
+
 class MultiControlledUnetModel(UNetModel):
     def __init__(self, is_adapter=False, *args, **kwargs):
         super().__init__(*args, **kwargs)

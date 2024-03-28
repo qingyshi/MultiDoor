@@ -117,4 +117,4 @@ class MultiAdapter(ControlLDM):
     def get_unconditional_conditioning(self, B):
         uncond = torch.zeros((B, 2, 224, 224, 3)).to('cuda')
         uncond = self.img_encoder(uncond)
-        return uncond
+        return uncond   # (b, n * 257, 1024)
