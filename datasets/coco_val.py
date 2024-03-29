@@ -13,10 +13,6 @@ class CocoValDataset(BaseDataset):
         self.root = root
         self.coco = COCO(annotation)
         self.data = list(sorted(self.coco.imgs.keys()))
-        
-        # with open(caption) as f:
-        #     self.caption = json.load(f)
-        
         self.transforms = transforms
         self.cat_to_names = {cat_id: cat['name'] for cat_id, cat in self.coco.cats.items()}
         self.dynamic = 0
@@ -31,39 +27,42 @@ class CocoValDataset(BaseDataset):
         img = np.array(Image.open(image_path).convert("RGB"))
 
         num_objs = len(coco_annotation)
-
-        masks = []
-        
         if num_objs >= 2:
             chosen_objs = np.random.choice(list(range(num_objs)), 2, replace=False)
-        elif num_objs == 1:
-            chosen_objs = [0]
         else:
             raise Exception
         
         names = []
-        for i, idx in enumerate(chosen_objs):
+        masks = []
+        bboxes = []
+        for idx in chosen_objs:
             ann = coco_annotation[idx]
-            if 'segmentation' in ann:
-                mask = self.coco.annToMask(ann)
-                masks.append(mask)
-            else:
-                masks.append(np.zeros((img.height, img.width)))
+            mask = self.coco.annToMask(ann)
+            bboxes.append(self.mask2bbox(mask))
+            masks.append(mask)
             names.append(self.cat_to_names[ann['category_id']])
 
         caption = " and ".join(names)
-        if len(names) == 1:
-            caption = caption + 'and nothing'
-        # labels = torch.tensor([ann['category_id'] for ann in coco_annotation], dtype=torch.int64)
         item_with_collage = self.process_pairs(ref_image=img, ref_mask=masks, 
                                                tar_image=img.copy(), tar_mask=masks.copy())
         sampled_time_steps = self.sample_timestep()
         
         item_with_collage['time_steps'] = sampled_time_steps
-        # item_with_collage['names'] = names
-        item_with_collage['img_path'] = image_path
+        item_with_collage['image_path'] = image_path
         item_with_collage['caption'] = caption
+        item_with_collage['ref_image'] = img
+        item_with_collage['masks'] = masks
+        item_with_collage['chosen_objs'] = chosen_objs
         return item_with_collage
 
     def __len__(self):
         return len(self.data)
+    
+    def mask2bbox(self, mask):
+        bbox = np.zeros_like(mask)
+        y1 = np.nonzero(np.max(mask, axis=1) == 1)[0].min()
+        y2 = np.nonzero(np.max(mask, axis=1) == 1)[0].max()
+        x1 = np.nonzero(np.max(mask, axis=0) == 1)[0].min()
+        x2 = np.nonzero(np.max(mask, axis=0) == 1)[0].max()
+        bbox[y1: y2, x1: x2] = 1
+        return bbox

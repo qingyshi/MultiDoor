@@ -109,13 +109,12 @@ class BaseDataset(Dataset):
             return True 
     
 
-    def process_pairs(self, ref_image, ref_mask, tar_image, tar_mask, max_ratio=0.9, mkdata=False):
+    def process_pairs(self, ref_image, ref_mask, tar_image, tar_mask, max_ratio=0.9):
         assert max(mask_score(ref_mask[0]), mask_score(ref_mask[1])) > 0.90
         assert self.check_mask_area(ref_mask[0]) == True
         assert self.check_mask_area(tar_mask[0]) == True
         assert self.check_mask_area(ref_mask[1]) == True
         assert self.check_mask_area(tar_mask[1]) == True
-
         '''
         inputs:
             ref_image: (H, W, 3)
@@ -127,18 +126,7 @@ class BaseDataset(Dataset):
             masked_ref_image_aug: (2, 224, 224, 3)
             cropped_target_image: (512, 512, 3)
             collage: (512, 512, 4)
-        '''
-        # if mkdata:
-        #     return {}
-        
-        if isinstance(ref_mask, np.ndarray) or len(ref_mask) == 1:
-            if isinstance(ref_mask, list):
-                ref_mask, tar_mask = ref_mask[0], tar_mask[0]
-            item = self.process_single_pair(ref_image, ref_mask, tar_image, tar_mask)
-            null_ref_image = np.zeros_like(item['ref'])
-            item['ref'] = np.stack([item['ref'], null_ref_image], axis=0)
-            return item
-        
+        '''   
         # Get the outline Box of the reference image
         multi_subject_ref_image = []
         multi_subject_ref_mask = []
@@ -186,7 +174,7 @@ class BaseDataset(Dataset):
         # ========= Training Target ===========
         multi_subject_bbox = []
         multi_subject_bbox_crop = []
-        
+        tar_masks = []
         for single_mask in tar_mask:
             tar_box_yyxx = get_bbox_from_mask(single_mask)
             tar_box_yyxx = expand_bbox(single_mask, tar_box_yyxx, ratio=[1.1, 1.2]) # 1.1, 1.3
@@ -216,6 +204,7 @@ class BaseDataset(Dataset):
             collage[y1: y2, x1: x2, :] = 0
             
         for single_bbox, ref_image_collage in zip(multi_subject_bbox, multi_ref_image_collage):
+            single_mask = cropped_target_image.copy() * 0.0
             tar_box_yyxx = box_in_box(single_bbox, tar_box_yyxx_crop)
             y1, y2, x1, x2 = tar_box_yyxx
             
@@ -225,6 +214,8 @@ class BaseDataset(Dataset):
             # stitch the hf map into the target image
             collage[y1: y2, x1: x2, :] += ref_image_collage
             collage_mask[y1: y2, x1: x2, :] = 1.0
+            single_mask[y1: y2, x1: x2, :] = 1.0
+            tar_masks.append(single_mask)
 
         if np.random.uniform(0, 1) < 0.7: 
             cropped_tar_mask = perturb_mask(cropped_tar_mask)
@@ -235,11 +226,14 @@ class BaseDataset(Dataset):
         cropped_target_image = pad_to_square(cropped_target_image, pad_value = 0, random = False).astype(np.uint8)
         collage = pad_to_square(collage, pad_value = 0, random = False).astype(np.uint8)
         collage_mask = pad_to_square(collage_mask, pad_value = 2, random = False).astype(np.uint8)
+        tar_masks = [pad_to_square(single_mask, pad_value = 0, random = False).astype(np.uint8) for single_mask in tar_masks]
         H2, W2 = collage.shape[0], collage.shape[1]
 
         cropped_target_image = cv2.resize(cropped_target_image.astype(np.uint8), (512, 512)).astype(np.float32)
         collage = cv2.resize(collage.astype(np.uint8), (512, 512)).astype(np.float32)
         collage_mask = cv2.resize(collage_mask.astype(np.uint8), (512, 512), interpolation = cv2.INTER_NEAREST).astype(np.float32)
+        tar_masks = [cv2.resize(single_mask.astype(np.uint8), (512, 512), interpolation = cv2.INTER_NEAREST).astype(np.float32) 
+                        for single_mask in tar_masks]
         collage_mask[collage_mask == 2] = -1
         
         # Prepairing dataloader items
@@ -253,7 +247,8 @@ class BaseDataset(Dataset):
                 jpg=cropped_target_image.copy(), 
                 hint=collage.copy(), 
                 extra_sizes=np.array([H1, W1, H2, W2]), 
-                tar_box_yyxx_crop=np.array(tar_box_yyxx_crop) 
+                tar_box_yyxx_crop=np.array(tar_box_yyxx_crop),
+                tar_masks=tar_masks
                 ) 
         return item
     

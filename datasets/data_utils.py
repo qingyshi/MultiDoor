@@ -67,15 +67,15 @@ def resize_and_pad(image, box):
 
 
 def expand_image_mask(image, mask, ratio=1.4):
-    h,w = image.shape[0], image.shape[1]
-    H,W = int(h * ratio), int(w * ratio) 
+    h, w = image.shape[0], image.shape[1]
+    H, W = int(h * ratio), int(w * ratio) 
     h1 = int((H - h) // 2)
     h2 = H - h - h1
     w1 = int((W -w) // 2)
-    w2 = W -w - w1
+    w2 = W - w - w1
 
-    pad_param_image = ((h1,h2),(w1,w2),(0,0))
-    pad_param_mask = ((h1,h2),(w1,w2))
+    pad_param_image = ((h1, h2), (w1, w2), (0, 0))
+    pad_param_mask = ((h1, h2), (w1, w2))
     image = np.pad(image, pad_param_image, 'constant', constant_values=255)
     mask = np.pad(mask, pad_param_mask, 'constant', constant_values=0)
     return image, mask

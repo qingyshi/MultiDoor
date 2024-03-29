@@ -45,13 +45,13 @@ def aug_data_mask(image, mask):
     return transformed_image, transformed_mask
 
 
-def process_pairs(ref_image, ref_mask, tar_image, tar_mask):
+def process_single_ref_image(ref_image, ref_mask, tar_image, tar_mask):
     '''
     inputs:
         ref_image: (H, W, 3)
-        ref_mask: (2, H, W)
+        ref_mask: [(H, W), (H, W)]
         tar_image: (H, W, 3)
-        tar_mask: (2, H, W)
+        tar_mask: [(H, W), (H, W)]
     
     outputs:
         ref: (2, 224, 224, 3)
@@ -167,7 +167,7 @@ def process_pairs(ref_image, ref_mask, tar_image, tar_mask):
     return item
 
 
-def process_multi_pairs(ref_image, ref_mask, tar_image, tar_mask):
+def process_multi_ref_images(ref_image, ref_mask, tar_image, tar_mask):
     '''
     inputs:
         ref_image: [(H1, W1, 3), (H2, W2, 3)]
@@ -317,7 +317,7 @@ def crop_back(pred, tar_image, extra_sizes, tar_box_yyxx_crop):
     return gen_image
 
 
-def inference_single_image(ref_image, ref_mask, tar_image, tar_mask, caption, guidance_scale = 5.0):
+def inference(ref_image, ref_mask, tar_image, tar_mask, caption, need_process, guidance_scale=5.0):
     '''
     inputs:
         ref_image.shape: (H, W, 3) or [(H1, W1, 3), (H2, W2, 3)]
@@ -325,24 +325,45 @@ def inference_single_image(ref_image, ref_mask, tar_image, tar_mask, caption, gu
         tar_image.shape: (H, W, 3)
         tar_mask.shape: [(H, W), (H, W)]
     '''
-    if isinstance(ref_image, list):
-        item = process_multi_pairs(ref_image, ref_mask, tar_image, tar_mask)
+    if need_process:
+        if isinstance(ref_image, list):
+            item = process_multi_ref_images(ref_image, ref_mask, tar_image, tar_mask)
+        else:
+            item = process_single_ref_image(ref_image, ref_mask, tar_image, tar_mask)
+        ref = item['ref']
+        tar = item['jpg'] 
+        hint = item['hint']
     else:
-        item = process_pairs(ref_image, ref_mask, tar_image, tar_mask)
+        multi_ref_image_collage = [sobel(masked_ref_image_compose, ref_mask_compose / 255) for 
+                            masked_ref_image_compose, ref_mask_compose in zip(ref_image, ref_mask)]
+        multi_bbox = []
+        for single_mask in tar_mask:
+            tar_box_yyxx = get_bbox_from_mask(single_mask)
+            multi_bbox.append(tar_box_yyxx)
+        collage = tar_image.copy()
+        collage_mask = tar_image.copy() * 0.0
+        tar_mask = np.max(tar_mask, axis=0)
+        for single_bbox, ref_image_collage in zip(multi_bbox, multi_ref_image_collage):
+            y1, y2, x1, x2 = single_bbox
+            # Prepairing collage image
+            ref_image_collage = cv2.resize(ref_image_collage.astype(np.uint8), (x2-x1, y2-y1))
+            # stitch the hf map into the target image
+            collage[y1: y2, x1: x2, :] = ref_image_collage
+            collage_mask[y1: y2, x1: x2, :] = 1.0
+        
+        ref = np.stack(ref_image, axis=0) / 255 
+        hint = np.concatenate([collage / 127.5 - 1.0, collage_mask[:, :, :1]] , -1)
+        item = None
 
-    ref = item['ref']
-    tar = item['jpg'] 
-    hint = item['hint']
     num_samples = 1
-
     control = torch.from_numpy(hint.copy()).float().cuda() 
     control = torch.stack([control for _ in range(num_samples)], dim=0)
     control = einops.rearrange(control, 'b h w c -> b c h w').clone()
 
-    # clip_input.shape: (n, 224, 224, 3)
-    dino_input = torch.from_numpy(ref.copy()).float().cuda() 
+    # dino_input.shape: (n, 224, 224, 3)
+    dino_input = torch.from_numpy(ref).float().cuda() 
     dino_input = torch.stack([dino_input for _ in range(num_samples)], dim=0)
-    dino_input = dino_input.clone().to('cuda')
+    dino_input = dino_input.clone()
     img_token = model.img_encoder(dino_input)   # (b, n * 256, 1024)
 
     guess_mode = False
@@ -361,15 +382,14 @@ def inference_single_image(ref_image, ref_mask, tar_image, tar_mask, caption, gu
         model.low_vram_shift(is_diffusing=True)
 
     # ====
-    num_samples = 1 # gr.Slider(label="Images", minimum=1, maximum=12, value=1, step=1)
-    image_resolution = 512  # gr.Slider(label="Image Resolution", minimum=256, maximum=768, value=512, step=64)
-    strength = 1  # gr.Slider(label="Control Strength", minimum=0.0, maximum=2.0, value=1.0, step=0.01)
-    guess_mode = False # gr.Checkbox(label='Guess Mode', value=False)
-    # detect_resolution = 512  #gr.Slider(label="Segmentation Resolution", minimum=128, maximum=1024, value=512, step=1)
-    ddim_steps = 50 # gr.Slider(label="Steps", minimum=1, maximum=100, value=20, step=1)
-    scale = guidance_scale  # gr.Slider(label="Guidance Scale", minimum=0.1, maximum=30.0, value=9.0, step=0.1)
-    seed = -1  # gr.Slider(label="Seed", minimum=-1, maximum=2147483647, step=1, randomize=True)
-    eta = 0.0   # gr.Number(label="eta (DDIM)", value=0.0)
+    num_samples = 1
+    image_resolution = 512
+    strength = 1
+    guess_mode = False
+    ddim_steps = 50
+    scale = guidance_scale
+    seed = -1 
+    eta = 0.0
 
     model.control_scales = [strength * (0.825 ** float(12 - i)) for i in range(13)] if guess_mode else ([strength] * 13)  # Magic number. IDK why. Perhaps because 0.825**12<0.01 but 0.826**12>0.01
     samples, intermediates = ddim_sampler.sample(ddim_steps, num_samples,
@@ -380,16 +400,19 @@ def inference_single_image(ref_image, ref_mask, tar_image, tar_mask, caption, gu
         model.low_vram_shift(is_diffusing=False)
 
     x_samples = model.decode_first_stage(samples)
-    x_samples = (einops.rearrange(x_samples, 'b c h w -> b h w c') * 127.5 + 127.5).cpu().numpy()#.clip(0, 255).astype(np.uint8)
+    x_samples = (einops.rearrange(x_samples, 'b c h w -> b h w c') * 127.5 + 127.5).cpu().numpy()
 
     result = x_samples[0][:, :, ::-1]
     result = np.clip(result, 0, 255)
 
     pred = x_samples[0]
-    pred = np.clip(pred, 0, 255)[1:, :, :]
-    sizes = item['extra_sizes']
-    tar_box_yyxx_crop = item['tar_box_yyxx_crop'] 
-    gen_image = crop_back(pred, tar_image, sizes, tar_box_yyxx_crop) 
+    pred = np.clip(pred, 0, 255)
+    if item is not None:
+        sizes = item['extra_sizes']
+        tar_box_yyxx_crop = item['tar_box_yyxx_crop'] 
+        gen_image = crop_back(pred, tar_image, sizes, tar_box_yyxx_crop)
+    else:
+        gen_image = pred
     return gen_image, hint
 
 
@@ -399,10 +422,10 @@ if __name__ == '__main__':
     # reference_mask_path = [ref_image_path.replace('jpg', 'png') for ref_image_path in reference_image_path]
     # bg_image_path = 'examples/background/00/00.png'
     # bg_mask_path = [bg_image_path.replace("00.png", "mask_0.png"), bg_image_path.replace("00.png", "mask_1.png")]
-    reference_image_path = 'examples/custom/board/ref.jpg'
-    reference_mask_path = ['examples/custom/board/0.png', 'examples/custom/board/1.png']
-    bg_image_path = 'examples/custom/board/scene.jpg'
-    bg_mask_path = ['examples/custom/board/tar01.png', 'examples/custom/board/tar02.png']
+    reference_image_path = ['examples/cocoval/ref/798.jpg', 'examples/cocoval/ref/792.jpg']
+    reference_mask_path = ['examples/cocoval/ref/798.png', 'examples/cocoval/ref/792.png']
+    bg_image_path = 'examples/cocoval/bg/142/bg.jpg'
+    bg_mask_path = ['examples/cocoval/bg/142/0.png', 'examples/cocoval/bg/142/1.png']
     start = 0
     while True:
         while True:
@@ -413,11 +436,9 @@ if __name__ == '__main__':
                 break
         if not os.path.exists(os.path.dirname(save_path)):
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        caption = ['The man is riding a skateboard.']
+        caption = ['The girl is sitting on the sofa.']
 
         # reference image + reference mask
-        # You could use the demo of SAM to extract RGB-A image with masks
-        # https://segment-anything.com/demo
         if isinstance(reference_image_path, list):
             image = [cv2.cvtColor(cv2.imread(ref_image_path), cv2.COLOR_BGR2RGB) for ref_image_path in reference_image_path]
         else:
@@ -434,14 +455,15 @@ if __name__ == '__main__':
         tar_mask = [np.array(Image.open(file).convert('L')) == 255 for file in bg_mask_path]
         tar_mask = np.stack(tar_mask, axis=0).astype(np.uint8)
         
-        gen_image, hint = inference_single_image(ref_image, ref_mask, back_image.copy(), tar_mask, caption)
+        gen_image, hint = inference(ref_image, ref_mask, back_image.copy(), tar_mask, caption, need_process=False)
+        
         h, w = back_image.shape[0], back_image.shape[1]
         hint = cv2.resize(hint, (w, h))
         hint = hint[:, :, :-1] * 127.5 + 127.5
         hint = hint.astype(np.uint8)
         if isinstance(ref_image, list):
-            ref_image = [cv2.resize(ref, (w, h)) for ref in ref_image]
-            vis_image = cv2.hconcat([ref_image[0], ref_image[1], back_image, hint, gen_image])
+            ref_image = [cv2.resize(ref, (w, h)).astype(np.uint8) for ref in ref_image]
+            vis_image = cv2.hconcat([ref_image[0], ref_image[1], back_image, hint, gen_image.astype(np.uint8)])
         else:
             ref_image = cv2.resize(ref_image, (w, h))
             tar_mask = [cv2.resize(tar_m, (w, h)) for tar_m in tar_mask]

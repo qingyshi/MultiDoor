@@ -2,7 +2,6 @@ import cv2
 import einops
 import numpy as np
 import torch
-import random
 from pytorch_lightning import seed_everything
 from cldm.model import create_model, load_state_dict
 from cldm.ddim_hacked import DDIMSampler
@@ -13,9 +12,6 @@ cv2.setNumThreads(0)
 cv2.ocl.setUseOpenCL(False)
 import albumentations as A
 from omegaconf import OmegaConf
-from PIL import Image
-import os
-from datasets.coco import CocoDataset
 from datasets.coco_val import CocoValDataset
 
 
@@ -25,7 +21,6 @@ if save_memory:
     enable_sliced_attention()
 
 DConf = OmegaConf.load('./configs/datasets.yaml')
-# dataset = CocoDataset(**DConf.Train.COCO)
 dataset = CocoValDataset(**DConf.Train.COCOVal)
 
 config = OmegaConf.load('./configs/inference.yaml')
@@ -36,313 +31,6 @@ model: MultiAdapter = create_model(model_config).cpu()
 model.load_state_dict(load_state_dict(model_ckpt, location='cuda'))
 model = model.cuda()
 ddim_sampler = DDIMSampler(model)
-
-
-
-def aug_data_mask(image, mask):
-    transform = A.Compose([
-        A.HorizontalFlip(p=0.5),
-        A.RandomBrightnessContrast(p=0.5),
-        ])
-    transformed = transform(image=image.astype(np.uint8), mask = mask)
-    transformed_image = transformed["image"]
-    transformed_mask = transformed["mask"]
-    return transformed_image, transformed_mask
-
-
-def process_pairs(ref_image, ref_mask, tar_image, tar_mask, max_ratio=0.9, mkdata=False):
-    assert max(mask_score(ref_mask[0]), mask_score(ref_mask[1])) > 0.90
-
-    '''
-    inputs:
-        ref_image: (H, W, 3)
-        ref_mask: [(H, W), (H, W)]
-        tar_image: (H, W, 3)
-        tar_mask: [(H, W), (H, W)]
-        
-    outputs:
-        masked_ref_image_aug: (2, 224, 224, 3)
-        cropped_target_image: (512, 512, 3)
-        collage: (512, 512, 4)
-    '''
-    # if mkdata:
-    #     return {}
-    
-    # if isinstance(ref_mask, np.ndarray) or len(ref_mask) == 1:
-    #     if isinstance(ref_mask, list):
-    #         ref_mask, tar_mask = ref_mask[0], tar_mask[0]
-    #     item = self.process_single_pair(ref_image, ref_mask, tar_image, tar_mask)
-    #     null_ref_image = np.zeros_like(item['ref'])
-    #     item['ref'] = np.stack([item['ref'], null_ref_image], axis=0)
-    #     return item
-    
-    # Get the outline Box of the reference image
-    multi_subject_ref_image = []
-    multi_subject_ref_mask = []
-    
-    for single_mask in ref_mask:
-        ref_box_yyxx = get_bbox_from_mask(single_mask)
-    
-        # Filtering background for the reference image
-        ref_mask_3 = np.stack([single_mask, single_mask, single_mask], -1)
-        masked_ref_image = ref_image * ref_mask_3 + np.ones_like(ref_image) * 255 * (1 - ref_mask_3)
-
-        y1, y2, x1, x2 = ref_box_yyxx
-        masked_ref_image = masked_ref_image[y1: y2, x1: x2, :]
-        single_mask = single_mask[y1: y2, x1: x2]
-
-        ratio = np.random.randint(11, 15) / 10 
-        masked_ref_image, single_mask = expand_image_mask(masked_ref_image, single_mask, ratio=ratio)
-        ref_mask_3 = np.stack([single_mask, single_mask, single_mask], -1)
-
-        # Padding reference image to square and resize to 224
-        masked_ref_image = pad_to_square(masked_ref_image, pad_value = 255, random = False)
-        masked_ref_image = cv2.resize(masked_ref_image.astype(np.uint8), (224, 224)).astype(np.uint8)
-
-        ref_mask_3 = pad_to_square(ref_mask_3 * 255, pad_value = 0, random = False)
-        ref_mask_3 = cv2.resize(ref_mask_3.astype(np.uint8), (224, 224)).astype(np.uint8)
-        single_mask = ref_mask_3[:, :, 0]
-
-        # Augmenting reference image
-        # masked_ref_image_aug = self.aug_data(masked_ref_image) 
-        masked_ref_image_compose, ref_mask_compose = aug_data_mask(masked_ref_image, single_mask) 
-        masked_ref_image_aug = masked_ref_image_compose.copy()
-        multi_subject_ref_image.append(masked_ref_image_aug)
-        multi_subject_ref_mask.append(ref_mask_compose)
-
-    masked_ref_image_compose = np.stack(multi_subject_ref_image, axis=0)
-    masked_ref_image_aug = masked_ref_image_compose.copy() # as ref image, shape: (2, 224, 244, 3)
-    # Getting for high-freqency map
-    multi_ref_image_collage = [sobel(masked_ref_image_compose, ref_mask_compose / 255) 
-                                    for masked_ref_image_compose, ref_mask_compose in 
-                                    zip(multi_subject_ref_image, multi_subject_ref_mask)]
-
-
-
-    # ========= Training Target ===========
-    multi_subject_bbox = []
-    multi_subject_bbox_crop = []
-    
-    for single_mask in tar_mask:
-        tar_box_yyxx = get_bbox_from_mask(single_mask)
-        tar_box_yyxx = expand_bbox(single_mask, tar_box_yyxx, ratio=[1.1, 1.2]) # 1.1, 1.3
-        multi_subject_bbox.append(tar_box_yyxx)
-        
-        # Cropping around the target object 
-        tar_box_yyxx_crop = expand_bbox(tar_image, tar_box_yyxx, ratio=[1.3, 3.0])   
-        tar_box_yyxx_crop = box2squre(tar_image, tar_box_yyxx_crop) # crop box
-        multi_subject_bbox_crop.append(tar_box_yyxx_crop)
-    
-    # Bbox which contains multi-subjects
-    y1 = min([bbox[0] for bbox in multi_subject_bbox_crop])
-    x1 = min([bbox[2] for bbox in multi_subject_bbox_crop])
-    y2 = max([bbox[1] for bbox in multi_subject_bbox_crop])
-    x2 = max([bbox[3] for bbox in multi_subject_bbox_crop])
-    tar_box_yyxx_crop = (y1, y2, x1, x2)
-    cropped_target_image = tar_image[y1: y2, x1: x2, :]
-    collage = cropped_target_image.copy()
-    collage_mask = cropped_target_image.copy() * 0.0
-    tar_mask = np.max(tar_mask, axis=0)
-    cropped_tar_mask = tar_mask[y1: y2, x1: x2]
-    
-    for single_bbox in multi_subject_bbox:
-        tar_box_yyxx = box_in_box(single_bbox, tar_box_yyxx_crop)
-        y1, y2, x1, x2 = tar_box_yyxx
-        collage[y1: y2, x1: x2, :] = 0
-        
-    for single_bbox, ref_image_collage in zip(multi_subject_bbox, multi_ref_image_collage):
-        tar_box_yyxx = box_in_box(single_bbox, tar_box_yyxx_crop)
-        y1, y2, x1, x2 = tar_box_yyxx
-        
-        # Prepairing collage image
-        ref_image_collage = cv2.resize(ref_image_collage.astype(np.uint8), (x2-x1, y2-y1))
-
-        # stitch the hf map into the target image
-        collage[y1: y2, x1: x2, :] += ref_image_collage
-        collage_mask[y1: y2, x1: x2, :] = 1.0
-
-    if np.random.uniform(0, 1) < 0.7: 
-        cropped_tar_mask = perturb_mask(cropped_tar_mask)
-        collage_mask = np.stack([cropped_tar_mask, cropped_tar_mask, cropped_tar_mask], -1)
-
-    H1, W1 = collage.shape[0], collage.shape[1]
-
-    cropped_target_image = pad_to_square(cropped_target_image, pad_value = 0, random = False).astype(np.uint8)
-    collage = pad_to_square(collage, pad_value = 0, random = False).astype(np.uint8)
-    collage_mask = pad_to_square(collage_mask, pad_value = 2, random = False).astype(np.uint8)
-    H2, W2 = collage.shape[0], collage.shape[1]
-
-    cropped_target_image = cv2.resize(cropped_target_image.astype(np.uint8), (512, 512)).astype(np.float32)
-    collage = cv2.resize(collage.astype(np.uint8), (512, 512)).astype(np.float32)
-    collage_mask = cv2.resize(collage_mask.astype(np.uint8), (512, 512), interpolation = cv2.INTER_NEAREST).astype(np.float32)
-    collage_mask[collage_mask == 2] = -1
-    
-    # Prepairing dataloader items
-    masked_ref_image_aug = masked_ref_image_aug / 255 
-    cropped_target_image = cropped_target_image / 127.5 - 1.0
-    collage = collage / 127.5 - 1.0 
-    collage = np.concatenate([collage, collage_mask[:, :, :1]], -1)
-    
-    item = dict(
-            ref=masked_ref_image_aug.copy(), 
-            jpg=cropped_target_image.copy(), 
-            hint=collage.copy(), 
-            extra_sizes=np.array([H1, W1, H2, W2]), 
-            tar_box_yyxx_crop=np.array(tar_box_yyxx_crop) 
-            ) 
-    return item
-
-
-def process_pairs_from_multi_image(ref_image, ref_mask, tar_image, tar_mask):
-    '''
-    inputs:
-        ref_image: [(H1, W1, 3), (H2, W2, 3)]
-        ref_mask: [(H1, W1), (H2, W2)]
-        tar_image: (H, W, 3)
-        tar_mask: [(H, W), (H, W)]
-    
-    outputs:
-        ref: (2, 224, 224, 3)
-        
-    '''
-    # ========= Reference ===========
-        # Get the outline Box of the reference image
-    multi_subject_ref_image = []
-    multi_subject_ref_mask = []
-    
-    for single_image, single_mask in zip(ref_image, ref_mask):
-        ref_box_yyxx = get_bbox_from_mask(single_mask)
-    
-        # Filtering background for the reference image
-        ref_mask_3 = np.stack([single_mask, single_mask, single_mask], -1)
-        masked_ref_image = single_image * ref_mask_3 + np.ones_like(single_image) * 255 * (1 - ref_mask_3)
-
-        y1, y2, x1, x2 = ref_box_yyxx
-        masked_ref_image = masked_ref_image[y1: y2, x1: x2, :]
-        single_mask = single_mask[y1: y2, x1: x2]
-
-        ratio = np.random.randint(11, 15) / 10 
-        masked_ref_image, single_mask = expand_image_mask(masked_ref_image, single_mask, ratio=ratio)
-        ref_mask_3 = np.stack([single_mask, single_mask, single_mask], -1)
-
-        # Padding reference image to square and resize to 224
-        masked_ref_image = pad_to_square(masked_ref_image, pad_value = 255, random = False)
-        masked_ref_image = cv2.resize(masked_ref_image.astype(np.uint8), (224, 224)).astype(np.uint8)
-
-        ref_mask_3 = pad_to_square(ref_mask_3 * 255, pad_value = 0, random = False)
-        ref_mask_3 = cv2.resize(ref_mask_3.astype(np.uint8), (224, 224)).astype(np.uint8)
-        single_mask = ref_mask_3[:, :, 0]
-
-        # Augmenting reference image
-        # masked_ref_image_aug = self.aug_data(masked_ref_image) 
-        
-        # Getting for high-freqency map
-        masked_ref_image_compose, ref_mask_compose = aug_data_mask(masked_ref_image, single_mask) 
-        masked_ref_image_aug = masked_ref_image_compose.copy()
-        multi_subject_ref_image.append(masked_ref_image_aug)
-        multi_subject_ref_mask.append(ref_mask_compose)
-
-    # ref_mask_compose = np.concatenate(multi_subject_ref_mask, axis=1)
-    ref_mask_3 = np.stack([ref_mask_compose, ref_mask_compose, ref_mask_compose], -1)
-    masked_ref_image_compose = np.stack(multi_subject_ref_image, axis=0)
-    masked_ref_image_aug = masked_ref_image_compose.copy()  # (2, 224, 244, 3)
-    # ref_image_collage = sobel(masked_ref_image_compose, ref_mask_compose / 255) # (224, 448, 3)
-    multi_ref_image_collage = [sobel(masked_ref_image_compose, ref_mask_compose / 255) for 
-                                masked_ref_image_compose in multi_subject_ref_image]
-
-    
-
-    # ========= Training Target ===========
-    multi_subject_bbox = []
-    multi_subject_bbox_crop = []
-    
-    for single_mask in tar_mask:
-        tar_box_yyxx = get_bbox_from_mask(single_mask)
-        tar_box_yyxx = expand_bbox(single_mask, tar_box_yyxx, ratio=[1.1, 1.2]) # 1.1  1.3
-        multi_subject_bbox.append(tar_box_yyxx)
-        
-        # Cropping around the target object 
-        tar_box_yyxx_crop = expand_bbox(tar_image, tar_box_yyxx, ratio=[1.3, 3.0])   
-        tar_box_yyxx_crop = box2squre(tar_image, tar_box_yyxx_crop) # crop box
-        multi_subject_bbox_crop.append(tar_box_yyxx_crop)
-    
-    y1, x1 = min([[bbox[0], bbox[2]] for bbox in multi_subject_bbox])
-    y2, x2 = max([[bbox[1], bbox[3]] for bbox in multi_subject_bbox])
-    tar_box_yyxx = (y1, y2, x1, x2)
-    
-    # bbox which contains multi-subjects
-    y1, x1 = min([[bbox[0], bbox[2]] for bbox in multi_subject_bbox_crop])
-    y2, x2 = max([[bbox[1], bbox[3]] for bbox in multi_subject_bbox_crop])
-    tar_box_yyxx_crop = (y1, y2, x1, x2)
-    cropped_target_image = tar_image[y1: y2, x1: x2, :]
-    collage = cropped_target_image.copy()
-    collage_mask = cropped_target_image.copy() * 0.0
-    tar_mask = np.max(tar_mask, axis=0)
-    cropped_tar_mask = tar_mask[y1: y2, x1: x2]
-    
-    for single_bbox, ref_image_collage in zip(multi_subject_bbox, multi_ref_image_collage):
-        tar_box_yyxx = box_in_box(single_bbox, tar_box_yyxx_crop)
-        y1, y2, x1, x2 = tar_box_yyxx
-
-        # Prepairing collage image
-        ref_image_collage = cv2.resize(ref_image_collage.astype(np.uint8), (x2-x1, y2-y1))
-        # ref_mask_compose = cv2.resize(ref_mask_compose.astype(np.uint8), (x2-x1, y2-y1))
-        # ref_mask_compose = (ref_mask_compose > 128).astype(np.uint8)
-
-        # stitch the hf map into the target image
-        collage[y1: y2, x1: x2, :] = ref_image_collage
-        collage_mask[y1: y2, x1: x2, :] = 1.0
-
-    H1, W1 = collage.shape[0], collage.shape[1]
-    cropped_target_image = pad_to_square(cropped_target_image, pad_value = 0, random = False).astype(np.uint8)
-    collage = pad_to_square(collage, pad_value = 0, random = False).astype(np.uint8)
-    collage_mask = pad_to_square(collage_mask, pad_value = 2, random = False).astype(np.uint8)
-    
-    H2, W2 = collage.shape[0], collage.shape[1]
-    cropped_target_image = cv2.resize(cropped_target_image.astype(np.uint8), (512, 512)).astype(np.float32)
-    collage = cv2.resize(collage.astype(np.uint8), (512, 512)).astype(np.float32)
-    collage_mask = cv2.resize(collage_mask.astype(np.uint8), (512, 512), interpolation = cv2.INTER_NEAREST).astype(np.float32)
-    
-    # Prepairing dataloader items
-    masked_ref_image_aug = masked_ref_image_aug / 255 
-    cropped_target_image = cropped_target_image / 127.5 - 1.0
-    collage = collage / 127.5 - 1.0 
-    collage = np.concatenate([collage, collage_mask[:, :, :1]] , -1)
-
-    item = dict(ref=masked_ref_image_aug.copy(), 
-                jpg=cropped_target_image.copy(), 
-                hint=collage.copy(), 
-                extra_sizes=np.array([H1, W1, H2, W2]), 
-                tar_box_yyxx_crop=np.array(tar_box_yyxx_crop) ) 
-    return item
-
-
-def crop_back(pred, tar_image, extra_sizes, tar_box_yyxx_crop):
-    H1, W1, H2, W2 = extra_sizes
-    y1, y2, x1, x2 = tar_box_yyxx_crop
-    h, w, _ = tar_image.shape
-    y2 = min(h, y2)
-    x2 = min(w, x2) 
-    m = 5 # maigin_pixel
-
-    if W1 == H1:
-        tar_image[y1+m: y2-m, x1+m: x2-m, :] = pred[m:-m, m:-m]
-        return tar_image
-
-    if W1 < W2:
-        pad1 = int((W2 - W1) / 2)
-        pad2 = W2 - W1 - pad1
-        pred = pred[:,pad1: -pad2, :]
-    else:
-        pad1 = int((H2 - H1) / 2)
-        pad2 = H2 - H1 - pad1
-        pred = pred[pad1: -pad2, :, :]
-
-    gen_image = tar_image.copy()
-    pred = cv2.resize(pred, (x2 - x1, y2 - y1))
-    gen_image[y1+m: y2-m, x1+m: x2-m, :] = pred[m:-m, m:-m]
-    return gen_image
-
 
 def inference_single_image(item, guidance_scale = 5.0):
     '''
@@ -397,25 +85,19 @@ def inference_single_image(item, guidance_scale = 5.0):
 
     model.control_scales = [strength * (0.825 ** float(12 - i)) for i in range(13)] if guess_mode else ([strength] * 13)  # Magic number. IDK why. Perhaps because 0.825**12<0.01 but 0.826**12>0.01
     samples, intermediates = ddim_sampler.sample(ddim_steps, num_samples,
-                                                    shape, cond, verbose=False, eta=eta,
-                                                    unconditional_guidance_scale=scale,
-                                                    unconditional_conditioning=un_cond)
+                                                 shape, cond, verbose=False, eta=eta,
+                                                 unconditional_guidance_scale=scale,
+                                                 unconditional_conditioning=un_cond)
     if save_memory:
         model.low_vram_shift(is_diffusing=False)
 
     x_samples = model.decode_first_stage(samples)
-    x_samples = (einops.rearrange(x_samples, 'b c h w -> b h w c') * 127.5 + 127.5).cpu().numpy()#.clip(0, 255).astype(np.uint8)
-
-    result = x_samples[0][:, :, ::-1]
-    result = np.clip(result, 0, 255)
+    x_samples = (einops.rearrange(x_samples, 'b c h w -> b h w c') * 127.5 + 127.5).cpu().numpy()
 
     pred = x_samples[0]
-    pred = np.clip(pred, 0, 255)[1:, :, :]
-    sizes = item['extra_sizes']
-    tar_box_yyxx_crop = item['tar_box_yyxx_crop'] 
+    pred = np.clip(pred, 0, 255)
     h, w, _ = tar.shape
     pred = cv2.resize(pred, (w, h))
-    # gen_image = crop_back(pred, tar, sizes, tar_box_yyxx_crop) 
     return pred
 
 
@@ -444,45 +126,3 @@ if __name__ == '__main__':
         print(data['caption'])
         print('finish!')
         count += 1
-    #'''
-    #'''
-    # ==== Example for inferring VITON-HD Test dataset ===
-
-    # from omegaconf import OmegaConf
-    # import os 
-    # DConf = OmegaConf.load('./configs/datasets.yaml')
-    # save_dir = './VITONGEN'
-    # if not os.path.exists(save_dir):
-    #     os.mkdir(save_dir)
-
-    # test_dir = DConf.Test.VitonHDTest.image_dir
-    # image_names = os.listdir(test_dir)
-    
-    # for image_name in image_names:
-    #     ref_image_path = os.path.join(test_dir, image_name)
-    #     tar_image_path = ref_image_path.replace('/cloth/', '/image/')
-    #     ref_mask_path = ref_image_path.replace('/cloth/','/cloth-mask/')
-    #     tar_mask_path = ref_image_path.replace('/cloth/', '/image-parse-v3/').replace('.jpg','.png')
-
-    #     ref_image = cv2.imread(ref_image_path)
-    #     ref_image = cv2.cvtColor(ref_image, cv2.COLOR_BGR2RGB)
-
-    #     gt_image = cv2.imread(tar_image_path)
-    #     gt_image = cv2.cvtColor(gt_image, cv2.COLOR_BGR2RGB)
-
-    #     ref_mask = (cv2.imread(ref_mask_path) > 128).astype(np.uint8)[:, :, 0]
-
-    #     tar_mask = Image.open(tar_mask_path ).convert('P')
-    #     tar_mask = np.array(tar_mask)
-    #     tar_mask = tar_mask == 5
-
-    #     gen_image = inference_single_image(ref_image, ref_mask, gt_image.copy(), tar_mask)
-    #     gen_path = os.path.join(save_dir, image_name)
-
-    #     vis_image = cv2.hconcat([ref_image, gt_image, gen_image])
-    #     cv2.imwrite(gen_path, vis_image[:, :, ::-1])
-    #'''
-
-    
-    
-

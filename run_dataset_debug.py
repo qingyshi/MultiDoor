@@ -12,6 +12,7 @@ from datasets.vitonhd import VitonHDDataset
 from datasets.fashiontryon import FashionTryonDataset
 from datasets.lvis import LvisDataset
 from datasets.coco import CocoDataset
+from datasets.coco_val import CocoValDataset
 from datasets.hico import HICODataset
 from datasets.psg import PSGDataset
 from datasets.pvsg import PVSGDataset
@@ -22,6 +23,9 @@ from torch.utils.data import DataLoader
 import numpy as np 
 import cv2
 import torch
+import json
+import os
+from tqdm import tqdm
 from omegaconf import OmegaConf
 
 # Datasets
@@ -43,32 +47,79 @@ DConf = OmegaConf.load('./configs/datasets.yaml')
 # dataset15 = PSGDataset()
 # dataset16 = PVSGDataset(data_root="/data00/OpenPVSG/data")
 # dataset17 = VGDataset()
-dataset18 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
+# dataset18 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
+dataset19 = CocoValDataset(**DConf.Train.COCOVal)
 
-# image_data = [dataset12]
-# video_data = [dataset1, dataset3, dataset4]
-# dataset = ConcatDataset(image_data + video_data + video_data)
-dataset = dataset18
+dataset = dataset19
+
+def find_save_path(is_mask):
+    image_dir = "examples/cocoval/ref"
+    image_name = 0
+    while True:
+        if not is_mask:
+            image_path = os.path.join(image_dir, str(image_name) + ".jpg")
+        else:
+            image_path = os.path.join(image_dir, str(image_name) + ".png")
+        if os.path.exists(image_path):
+            image_name += 1
+        else:
+            break
+    return image_path
+
+def save_image_mask_pair(image, mask):
+    image_path = find_save_path(is_mask=False)
+    mask_path = find_save_path(is_mask=True)
+    cv2.imwrite(image_path, image)
+    cv2.imwrite(mask_path, mask)
 
 def vis_sample(item):
     ref = torch.cat([item['ref'][:, i] for i in range(2)], dim=2) * 255
     tar = item['jpg'] * 127.5 + 127.5
     hint = item['hint'] * 127.5 + 127.5
+    tar_masks = item['tar_masks']
     step = item['time_steps']
-    print(item['ref'].shape, tar.shape, hint.shape, step.shape)
 
-    ref = ref[0].numpy()
-    tar = tar[0].numpy()
+    ref1, ref2 = torch.chunk(ref[0], 2, dim=1)
+    mask1 = (ref1.sum(-1) != 255 * 3).to(torch.uint8) * 255
+    mask2 = (ref2.sum(-1) != 255 * 3).to(torch.uint8) * 255
+    ref1, ref2, mask1, mask2 = ref1.numpy()[:, :, ::-1], ref2.numpy()[:, :, ::-1], mask1.numpy(), mask2.numpy()
+    save_image_mask_pair(ref1, mask1)
+    save_image_mask_pair(ref2, mask2)
+    
     hint_image = hint[0, :, :, :-1].numpy()
     hint_mask = hint[0, :, :, -1].numpy()
-    hint_mask = np.stack([hint_mask, hint_mask,hint_mask],-1)
-    ref = cv2.resize(ref.astype(np.uint8), (512, 512))
-    vis = cv2.hconcat([ref.astype(np.float32), hint_image.astype(np.float32), hint_mask.astype(np.float32), tar.astype(np.float32)])
-    cv2.imwrite('sample_vis.jpg', vis[:, :, ::-1])
-    print(item['caption'][0])
+    hint_mask = np.stack([hint_mask, hint_mask, hint_mask],-1)
+    ref1 = cv2.resize(ref1.astype(np.uint8), (512, 512))
+    ref2 = cv2.resize(ref2.astype(np.uint8), (512, 512))
+    tar = tar[0].numpy()
+    vis = cv2.hconcat([ref1.astype(np.float32), ref2.astype(np.float32), hint_image.astype(np.float32), hint_mask.astype(np.float32), tar.astype(np.float32)])
+    tar_mask1, tar_mask2 = tar_masks[0] * 255, tar_masks[1] * 255
+    bg = "examples/cocoval/bg"
+    bg_dir = 0
+    while True:
+        dir_path = os.path.join(bg, str(bg_dir))
+        if os.path.exists(dir_path):
+            bg_dir += 1
+            continue
+        else:
+            os.makedirs(dir_path)
+            bg_path = os.path.join(dir_path, "bg.jpg")
+            bg_mask_path1 = os.path.join(dir_path, "0.png")
+            bg_mask_path2 = os.path.join(dir_path, "1.png")
+            cv2.imwrite(bg_path, tar[:, :, ::-1])
+            cv2.imwrite(bg_mask_path1, tar_mask1[0].numpy())
+            cv2.imwrite(bg_mask_path2, tar_mask2[0].numpy())
+            break        
+    # cv2.imwrite('sample_vis.jpg', vis[:, :, ::-1])
+    # anno = {}
+    # anno['image_path'] = item['image_path'][0]
+    # anno['caption'] = item['caption'][0]
+    # anno['chosen_objs'] = item['chosen_objs'].tolist()[0]
+    # annotations.append(anno)
+
 
 dataloader = DataLoader(dataset, num_workers=8, batch_size=1, shuffle=True)
 print('len dataloader: ', len(dataloader))
-for data in dataloader:
-    vis_sample(data) 
-    # break
+annotations = []
+for data in tqdm(dataloader):
+    vis_sample(data)
