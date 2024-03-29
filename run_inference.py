@@ -422,10 +422,12 @@ if __name__ == '__main__':
     # reference_mask_path = [ref_image_path.replace('jpg', 'png') for ref_image_path in reference_image_path]
     # bg_image_path = 'examples/background/00/00.png'
     # bg_mask_path = [bg_image_path.replace("00.png", "mask_0.png"), bg_image_path.replace("00.png", "mask_1.png")]
-    reference_image_path = ['examples/cocoval/ref/798.jpg', 'examples/cocoval/ref/792.jpg']
-    reference_mask_path = ['examples/cocoval/ref/798.png', 'examples/cocoval/ref/792.png']
-    bg_image_path = 'examples/cocoval/bg/142/bg.jpg'
-    bg_mask_path = ['examples/cocoval/bg/142/0.png', 'examples/cocoval/bg/142/1.png']
+    reference_image_path = ['examples/cocoval/ref/6.jpg', 'examples/cocoval/ref/6.jpg']
+    reference_mask_path = [image_path.replace(".jpg", ".png") for 
+                            image_path in reference_image_path]
+    bg_image_path = 'examples/cocoval/bg/4993/bg.jpg'
+    bg_mask_path = ['examples/cocoval/bg/4993/0.png', 'examples/cocoval/bg/4993/1.png']
+    caption = ['The elephant is drinking water with the elephant.']
     start = 0
     while True:
         while True:
@@ -436,7 +438,6 @@ if __name__ == '__main__':
                 break
         if not os.path.exists(os.path.dirname(save_path)):
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        caption = ['The girl is sitting on the sofa.']
 
         # reference image + reference mask
         if isinstance(reference_image_path, list):
