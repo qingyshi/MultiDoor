@@ -114,7 +114,11 @@ class MultiAdapter(ControlLDM):
         return log
     
     @torch.no_grad()
-    def get_unconditional_conditioning(self, B):
-        uncond = torch.zeros((B, 2, 224, 224, 3)).to('cuda')
-        uncond = self.img_encoder(uncond)
-        return uncond   # (b, n * 257, 1024)
+    def get_unconditional_conditioning(self, num_samples, image_guidance=True):
+        if image_guidance:
+            uncond = torch.zeros((num_samples, 2, 224, 224, 3)).to('cuda')
+            uncond = self.img_encoder(uncond)
+        else:
+            uncond = [" "] * num_samples
+            uncond = self.cond_stage_model(uncond)
+        return uncond   # (b, n * 257, 1024) or (b, 77, 1024)

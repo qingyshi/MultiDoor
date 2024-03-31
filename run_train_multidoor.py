@@ -25,8 +25,8 @@ learning_rate = 1e-5
 sd_locked = False
 only_mid_control = False
 n_gpus = 4
-accumulate_grad_batches = 1
-max_epochs = 24
+accumulate_grad_batches = 2
+max_epochs = 12
 
 # First use cpu to load models. Pytorch Lightning will automatically move it to GPUs.
 model = create_model('./configs/multidoor.yaml').cpu()
@@ -49,9 +49,9 @@ image_data = [dataset1, dataset2, dataset3]
 video_data = [dataset4, dataset5, dataset6, dataset7]
 
 # The ratio of each dataset is adjusted by setting the __len__ 
-dataset = ConcatDataset(image_data + video_data)
+dataset = ConcatDataset(image_data + video_data + video_data)
 dataloader = DataLoader(dataset, num_workers=8, batch_size=batch_size, shuffle=True)
-logger = ImageLogger(batch_frequency=logger_freq, split="psg_train")
+logger = ImageLogger(batch_frequency=logger_freq, split="12e")
 trainer = pl.Trainer(
     gpus=n_gpus,
     strategy="ddp",

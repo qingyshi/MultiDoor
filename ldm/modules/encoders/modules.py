@@ -187,7 +187,7 @@ class FrozenOpenCLIPEmbedder(AbstractEncoder):
     def forward(self, text):
         tokens = open_clip.tokenize(text)
         z = self.encode_with_transformer(tokens.to(self.device))
-        return z
+        return z    # (b, max_length, 1024)
 
     def encode_with_transformer(self, text):
         x = self.model.token_embedding(text)  # [batch_size, n_ctx, d_model]

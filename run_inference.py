@@ -7,7 +7,7 @@ from pytorch_lightning import seed_everything
 from cldm.model import create_model, load_state_dict
 from cldm.ddim_hacked import DDIMSampler
 from cldm.hack import disable_verbosity, enable_sliced_attention
-from cldm.multidoor import MultiDoor
+from cldm.multiadapter import MultiAdapter
 from datasets.data_utils import * 
 cv2.setNumThreads(0)
 cv2.ocl.setUseOpenCL(False)
@@ -27,7 +27,7 @@ config = OmegaConf.load('./configs/inference.yaml')
 model_ckpt = config.pretrained_model
 model_config = config.config_file
 
-model: MultiDoor = create_model(model_config).cpu()
+model: MultiAdapter = create_model(model_config).cpu()
 model.load_state_dict(load_state_dict(model_ckpt, location='cuda'))
 model = model.cuda()
 ddim_sampler = DDIMSampler(model)
@@ -128,7 +128,6 @@ def process_single_ref_image(ref_image, ref_mask, tar_image, tar_mask):
     collage = cropped_target_image.copy()
     collage_mask = cropped_target_image.copy() * 0.0
     tar_mask = np.max(tar_mask, axis=0)
-    cropped_tar_mask = tar_mask[y1: y2, x1: x2]
     
     for single_bbox, ref_image_collage in zip(multi_subject_bbox, multi_ref_image_collage):
         tar_box_yyxx = box_in_box(single_bbox, tar_box_yyxx_crop)
@@ -317,7 +316,7 @@ def crop_back(pred, tar_image, extra_sizes, tar_box_yyxx_crop):
     return gen_image
 
 
-def inference(ref_image, ref_mask, tar_image, tar_mask, caption, need_process, guidance_scale=5.0):
+def inference(ref_image, ref_mask, tar_image, tar_mask, caption, need_process, image_guidance=False, guidance_scale=5.0):
     '''
     inputs:
         ref_image.shape: (H, W, 3) or [(H1, W1, 3), (H2, W2, 3)]
@@ -371,11 +370,14 @@ def inference(ref_image, ref_mask, tar_image, tar_mask, caption, need_process, g
     
     clip_input = caption * num_samples
     cond_text = model.get_learned_conditioning(clip_input) # (b, 77, 1024)
-    uncond = model.get_unconditional_conditioning(num_samples) # (b, 77, 1024)
+    uncond = model.get_unconditional_conditioning(num_samples, image_guidance=image_guidance) # (b, 77, 1024) or (b, 514, 1024)
     # caption_embedding: (b, 77, 1024)
     
     cond = {"c_concat": [control], "c_crossattn": [cond_text], "img_token": [img_token]}
-    un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [uncond], "img_token": [img_token]}
+    if image_guidance:
+        un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [cond_text], "img_token": [uncond]}
+    else:
+        un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [uncond], "img_token": [img_token]}
     shape = (4, H // 8, W // 8)
 
     if save_memory:
@@ -418,17 +420,20 @@ def inference(ref_image, ref_mask, tar_image, tar_mask, caption, need_process, g
 
 if __name__ == '__main__': 
     # ==== Example for inferring a single image ===
-    # reference_image_path = ['examples/dataset/dog/01.jpg', 'examples/dataset/pink_sunglasses/03.jpg']
+    # reference_image_path = ['examples/dataset/dog/04.jpg', 'examples/dataset/dog2/04.jpg']
     # reference_mask_path = [ref_image_path.replace('jpg', 'png') for ref_image_path in reference_image_path]
-    # bg_image_path = 'examples/background/00/00.png'
-    # bg_mask_path = [bg_image_path.replace("00.png", "mask_0.png"), bg_image_path.replace("00.png", "mask_1.png")]
-    reference_image_path = ['examples/cocoval/ref/6.jpg', 'examples/cocoval/ref/6.jpg']
+    # bg_image_path = 'examples/background/11/00.png'
+    # bg_mask_path = [bg_image_path.replace("00.png", "mask_1.png"), bg_image_path.replace("00.png", "mask_0.png")]
+    reference_image_path = ['examples/cocoval/ref/538.jpg', 'examples/cocoval/ref/539.jpg']
     reference_mask_path = [image_path.replace(".jpg", ".png") for 
-                            image_path in reference_image_path]
-    bg_image_path = 'examples/cocoval/bg/4993/bg.jpg'
-    bg_mask_path = ['examples/cocoval/bg/4993/0.png', 'examples/cocoval/bg/4993/1.png']
-    caption = ['The elephant is drinking water with the elephant.']
+                                        image_path in reference_image_path]
+    bg_id = 87
+    bg_image_path = f'examples/cocoval/bg/{bg_id}/bg.jpg'
+    bg_mask_path = [f'examples/cocoval/bg/{bg_id}/0.png', f'examples/cocoval/bg/{bg_id}/1.png']
+    caption = ['The person is holding the tennis racket.']
     start = 0
+    need_process = False
+    image_guidance = True
     while True:
         while True:
             save_path = os.path.join(os.path.dirname(bg_image_path), "GEN", f"{start}.png")
@@ -456,7 +461,7 @@ if __name__ == '__main__':
         tar_mask = [np.array(Image.open(file).convert('L')) == 255 for file in bg_mask_path]
         tar_mask = np.stack(tar_mask, axis=0).astype(np.uint8)
         
-        gen_image, hint = inference(ref_image, ref_mask, back_image.copy(), tar_mask, caption, need_process=False)
+        gen_image, hint = inference(ref_image, ref_mask, back_image, tar_mask, caption, need_process=need_process, image_guidance=image_guidance, guidance_scale=7.5)
         
         h, w = back_image.shape[0], back_image.shape[1]
         hint = cv2.resize(hint, (w, h))
