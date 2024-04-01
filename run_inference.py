@@ -395,9 +395,9 @@ def inference(ref_image, ref_mask, tar_image, tar_mask, caption, need_process, i
 
     model.control_scales = [strength * (0.825 ** float(12 - i)) for i in range(13)] if guess_mode else ([strength] * 13)  # Magic number. IDK why. Perhaps because 0.825**12<0.01 but 0.826**12>0.01
     samples, intermediates = ddim_sampler.sample(ddim_steps, num_samples,
-                                                    shape, cond, verbose=False, eta=eta,
-                                                    unconditional_guidance_scale=scale,
-                                                    unconditional_conditioning=un_cond)
+                                                 shape, cond, verbose=False, eta=eta,
+                                                 unconditional_guidance_scale=scale,
+                                                 unconditional_conditioning=un_cond)
     if save_memory:
         model.low_vram_shift(is_diffusing=False)
 
@@ -424,16 +424,16 @@ if __name__ == '__main__':
     # reference_mask_path = [ref_image_path.replace('jpg', 'png') for ref_image_path in reference_image_path]
     # bg_image_path = 'examples/background/11/00.png'
     # bg_mask_path = [bg_image_path.replace("00.png", "mask_1.png"), bg_image_path.replace("00.png", "mask_0.png")]
-    reference_image_path = ['examples/cocoval/ref/538.jpg', 'examples/cocoval/ref/539.jpg']
+    reference_image_path = ['examples/cocoval/ref/39.jpg', 'examples/cocoval/ref/1125.jpg']
     reference_mask_path = [image_path.replace(".jpg", ".png") for 
                                         image_path in reference_image_path]
-    bg_id = 87
+    bg_id = 142
     bg_image_path = f'examples/cocoval/bg/{bg_id}/bg.jpg'
     bg_mask_path = [f'examples/cocoval/bg/{bg_id}/0.png', f'examples/cocoval/bg/{bg_id}/1.png']
-    caption = ['The person is holding the tennis racket.']
+    caption = ['The person is sitting on the sofa']
     start = 0
     need_process = False
-    image_guidance = True
+    image_guidance = False
     while True:
         while True:
             save_path = os.path.join(os.path.dirname(bg_image_path), "GEN", f"{start}.png")

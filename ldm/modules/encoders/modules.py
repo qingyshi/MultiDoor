@@ -271,7 +271,7 @@ class FrozenOpenCLIPImageEncoder(AbstractEncoder):
 
 sys.path.append("./dinov2")
 # import dinov2.hubconf as hubconf
-import hubconf
+import hubconfv2 as hubconf
 from einops import rearrange
 from omegaconf import OmegaConf
 config_path = './configs/multidoor.yaml'
