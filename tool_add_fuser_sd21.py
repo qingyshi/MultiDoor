@@ -15,7 +15,7 @@ from share import *
 from cldm.model import create_model
 
 
-# python tool_add_fuser_sd21.py /data00/sqy/checkpoints/anydoor/AnyDoor/epoch=1-step=8687.ckpt checkpoints/anydoor_ini.ckpt
+# python tool_add_fuser_sd21.py /data00/sqy/checkpoints/stable-diffusion-2-1-base/v2-1_512-ema-pruned.ckpt checkpoints/sd_ini.ckpt
 
 def get_node_name(name, parent_name):
     if len(name) <= len(parent_name):
@@ -36,14 +36,13 @@ scratch_dict = model.state_dict()
 
 target_dict = {}
 for k in scratch_dict.keys():
-    if "cond_stage_model" in k:
+    if "input_blocks.0" in k:
+        print(f"skip weights: {k}")
         continue
-    elif "img_encoder" in k:
-        copy_k = k.replace("img_encoder", "cond_stage_model")  
-    elif "fuser.attn1" in k:
-        copy_k = k.replace("fuser.attn1", "attn2")
-    elif "fuser.norm1" in k:
-        copy_k = k.replace("fuser.norm1", "norm2")
+    elif "to_k_ip" in k:
+        copy_k = k.replace("to_k_ip", "to_k")
+    elif "to_v_ip" in k:
+        copy_k = k.replace("to_v_ip", "to_v")
     else:
         copy_k = k
       

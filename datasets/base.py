@@ -34,7 +34,7 @@ class BaseDataset(Dataset):
         transform = A.Compose([
             A.HorizontalFlip(p=0.5),
             A.RandomBrightnessContrast(p=0.5),
-            # A.Rotate(limit=20, border_mode=cv2.BORDER_CONSTANT, value=(0,0,0)),
+            A.Rotate(limit=20, border_mode=cv2.BORDER_CONSTANT, value=(0,0,0)),
             ])
 
         transformed = transform(image=image.astype(np.uint8), mask=mask)
@@ -355,7 +355,7 @@ class BaseDataset(Dataset):
         masked_ref_image_aug = masked_ref_image_aug  / 255 
         cropped_target_image = cropped_target_image / 127.5 - 1.0
         collage = collage / 127.5 - 1.0 
-        collage = np.concatenate([collage, collage_mask[:,:,:1]  ] , -1)
+        collage = np.concatenate([collage, collage_mask[:, :, :1]], -1)
         
         item = dict(
                 ref=masked_ref_image_aug.copy(), 

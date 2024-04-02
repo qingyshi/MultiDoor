@@ -6,8 +6,7 @@ from transformers import T5Tokenizer, T5EncoderModel, CLIPTokenizer, CLIPTextMod
 import torchvision.transforms as T
 import open_clip
 from ldm.util import default, count_params
-from PIL import Image
-from open_clip.transform import image_transform
+from cldm.utils import TokenSelection
 import sys
 
 
@@ -276,7 +275,7 @@ from einops import rearrange
 from omegaconf import OmegaConf
 config_path = './configs/multidoor.yaml'
 config = OmegaConf.load(config_path)
-DINOv2_weight_path = config.model.params.img_cond_config.weight
+DINOv2_weight_path = config.model.params.image_cond_config.weight
 
 class FrozenDinoV2Encoder(AbstractEncoder):
     """
@@ -353,6 +352,7 @@ class FrozenMultiDoorEncoder(AbstractEncoder):
         self.image_std =  torch.tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
         self.obj_emb = torch.nn.Parameter(torch.randn(2))     
         self.projector = nn.Linear(1536, 1024)
+        self.token_select = TokenSelection(k=24)
 
     def freeze(self):
         self.model.eval()
@@ -377,7 +377,8 @@ class FrozenMultiDoorEncoder(AbstractEncoder):
         clstoken  = features["x_norm_clstoken"]
         patchtokens = patchtokens.reshape(b, n, 256, -1)
         clstoken = clstoken.reshape(b, n, 1, -1)
-        image_features = torch.cat((clstoken, patchtokens), dim=-2) # (b, n, 257, 1536)
+        selected_patchtokens = self.token_select(patchtokens)   # (b, n, k, 1536)
+        image_features = torch.cat((clstoken, selected_patchtokens), dim=-2) # (b, n, k+1, 1536)
         emb = self.obj_emb.view(1, 2, 1, 1)
         image_features = image_features + emb
         hint = self.projector(image_features)

@@ -7,6 +7,7 @@ from einops import rearrange, repeat
 from typing import Optional, Any
 
 from ldm.modules.diffusionmodules.util import checkpoint
+from ldm.modules.ip_adapter import AttnProcessor, IPAttnProcessor
 
 
 try:
@@ -248,29 +249,75 @@ class MemoryEfficientCrossAttention(nn.Module):
 
 
 
-class IPCrossAttention(nn.Module):
-    ATTENTION_MODES = {
-        "softmax": CrossAttention,  # vanilla attention
-        "softmax-xformers": MemoryEfficientCrossAttention
-    }
-    def __init__(self, query_dim, sub_dim,  n_heads, d_head, dropout=0.):
+class IPAdapter(nn.Module):
+    def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0.):
         super().__init__()
-        attn_mode = "softmax-xformers" if XFORMERS_IS_AVAILBLE else "softmax"
-        assert attn_mode in self.ATTENTION_MODES
-        attn_cls = self.ATTENTION_MODES[attn_mode]
-        self.attn1 = attn_cls(query_dim=query_dim, context_dim=sub_dim, 
-                              heads=n_heads, dim_head=d_head, dropout=dropout)
-        self.norm1 = nn.LayerNorm(query_dim)
+        inner_dim = dim_head * heads
+        context_dim = default(context_dim, query_dim)
 
-        # self.register_parameter('alpha_attn', nn.Parameter(torch.tensor(0.)) )
+        self.scale = dim_head ** -0.5
+        self.heads = heads
 
-        # this can be useful: we can externally change magnitude of tanh(alpha)
-        # for example, when it is set to 0, then the entire model is same as original one 
-        self.scale = 1  
+        self.to_q = nn.Linear(query_dim, inner_dim, bias=False)
+        self.to_k = nn.Linear(context_dim, inner_dim, bias=False)
+        self.to_v = nn.Linear(context_dim, inner_dim, bias=False)
 
-    def forward(self, x, subjects):
-        attention_output = self.attn1(self.norm1(x), subjects)
-        return self.scale * attention_output
+        self.to_out = nn.Sequential(
+            nn.Linear(inner_dim, query_dim),
+            nn.Dropout(dropout)
+        )
+        self.cross_attn_map_store = None
+        
+        self.to_k_ip = nn.Linear(context_dim, inner_dim, bias=False)
+        self.to_v_ip = nn.Linear(context_dim, inner_dim, bias=False)
+        self.ip_scale = 1
+
+    def forward(self, x, context=None, subject=None, mask=None):
+        h = self.heads
+
+        q = self.to_q(x)
+        context = default(context, x)
+        k = self.to_k(context)
+        v = self.to_v(context)
+        
+        ip_key = self.to_k_ip(subject)
+        ip_value = self.to_v_ip(subject)
+
+        q, k, v, ip_key, ip_value = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), 
+                                                (q, k, v, ip_key, ip_value))
+
+        # force cast to fp32 to avoid overflowing
+        if _ATTN_PRECISION =="fp32":
+            with torch.autocast(enabled=False, device_type = 'cuda'):
+                q, k, ip_key = q.float(), k.float(), ip_key.float()
+                sim = einsum('b i d, b j d -> b i j', q, k) * self.scale
+                ip_sim = einsum('b i d, b j d -> b i j', q, ip_key) * self.scale
+        else:
+            sim = einsum('b i d, b j d -> b i j', q, k) * self.scale
+            ip_sim = einsum('b i d, b j d -> b i j', q, ip_key) * self.scale
+        
+        del q, k, ip_key
+    
+        if exists(mask):
+            mask = rearrange(mask, 'b ... -> b (...)')
+            max_neg_value = -torch.finfo(sim.dtype).max
+            mask = repeat(mask, 'b j -> (b h) () j', h=h)
+            sim.masked_fill_(~mask, max_neg_value)
+
+        # attention, what we cannot get enough of
+        sim = sim.softmax(dim=-1)
+        ip_sim = ip_sim.softmax(dim=-1)
+
+        if self.cross_attn_map_store is not None:
+            self.cross_attn_map_store(sim)
+        
+        out = einsum('b i j, b j d -> b i d', sim, v)
+        ip_out = einsum('b i j, b j d -> b i d', ip_sim, ip_value)
+        out = rearrange(out, '(b h) n d -> b n (h d)', h=h)
+        ip_out = rearrange(ip_out, '(b h) n d -> b n (h d)', h=h)
+        
+        out = out + self.ip_scale * ip_out
+        return self.to_out(out)
 
 
 class BasicTransformerBlock(nn.Module):
@@ -279,7 +326,7 @@ class BasicTransformerBlock(nn.Module):
         "softmax-xformers": MemoryEfficientCrossAttention
     }
     def __init__(self, dim, n_heads, d_head, dropout=0., context_dim=None, gated_ff=True, checkpoint=True,
-                 disable_self_attn=False, is_controlnet=False, ip_adapter=False):
+                 disable_self_attn=False):
         super().__init__()
         attn_mode = "softmax-xformers" if XFORMERS_IS_AVAILBLE else "softmax"
         assert attn_mode in self.ATTENTION_MODES
@@ -288,36 +335,20 @@ class BasicTransformerBlock(nn.Module):
         self.attn1 = attn_cls(query_dim=dim, heads=n_heads, dim_head=d_head, dropout=dropout,
                               context_dim=context_dim if self.disable_self_attn else None)  # is a self-attention if not self.disable_self_attn
         self.ff = FeedForward(dim, dropout=dropout, glu=gated_ff)
-        self.attn2 = attn_cls(query_dim=dim, context_dim=context_dim,
+        self.attn2 = IPAdapter(query_dim=dim, context_dim=context_dim,
                               heads=n_heads, dim_head=d_head, dropout=dropout)  # is self-attn if context is none
 
         self.norm1 = nn.LayerNorm(dim)
         self.norm2 = nn.LayerNorm(dim)
         self.norm3 = nn.LayerNorm(dim)
         self.checkpoint = checkpoint
-        
-        if not is_controlnet:
-            self.fuser = IPCrossAttention(query_dim=dim, sub_dim=context_dim,
-                                n_heads=n_heads, d_head=d_head, dropout=dropout)  # is self-attn if context is none
-        self.ip_adapter = ip_adapter
 
     def forward(self, x, caption=None, subject=None):
-        if subject is None:
-            return checkpoint(self._forward, (x, caption), self.parameters(), self.checkpoint)
         return checkpoint(self._forward, (x, caption, subject), self.parameters(), self.checkpoint)
         
     def _forward(self, x, caption=None, subject=None):
         x = self.attn1(self.norm1(x), context=caption if self.disable_self_attn else None) + x
-        if subject is not None:
-            if self.ip_adapter:
-                x1 = self.fuser(x, subjects=subject)
-                x2 = self.attn2(self.norm2(x), context=caption)
-                x = x1 + x2 + x
-            else:
-                x = self.fuser(x, subjects=subject) + x
-                x = self.attn2(self.norm2(x), context=caption) + x
-        else:
-            x = self.attn2(self.norm2(x), context=caption) + x
+        x = self.attn2(self.norm2(x), context=caption, subject=subject) + x
         x = self.ff(self.norm3(x)) + x
         return x
 
@@ -334,7 +365,7 @@ class SpatialTransformer(nn.Module):
     def __init__(self, in_channels, n_heads, d_head,
                  depth=1, dropout=0., context_dim=None,
                  disable_self_attn=False, use_linear=False,
-                 use_checkpoint=True, is_controlnet=False):
+                 use_checkpoint=True):
         super().__init__()
         if exists(context_dim) and not isinstance(context_dim, list):
             context_dim = [context_dim]
@@ -352,7 +383,7 @@ class SpatialTransformer(nn.Module):
 
         self.transformer_blocks = nn.ModuleList(
             [BasicTransformerBlock(inner_dim, n_heads, d_head, dropout=dropout, context_dim=context_dim[d],
-                                   disable_self_attn=disable_self_attn, checkpoint=use_checkpoint, is_controlnet=is_controlnet)
+                                   disable_self_attn=disable_self_attn, checkpoint=use_checkpoint)
                 for d in range(depth)]
         )
         if not use_linear:

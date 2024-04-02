@@ -18,8 +18,8 @@ if save_memory:
     enable_sliced_attention()
 
 # Configs
-resume_path = '/data00/sqy/checkpoints/anydoor/anydoor_ini.ckpt'
-batch_size = 4
+resume_path = 'checkpoints/sd_ini.ckpt'
+batch_size = 8
 logger_freq = 2000
 learning_rate = 1e-5
 sd_locked = False
@@ -51,7 +51,7 @@ video_data = [dataset4, dataset5, dataset6, dataset7]
 # The ratio of each dataset is adjusted by setting the __len__ 
 dataset = ConcatDataset(image_data + video_data + video_data)
 dataloader = DataLoader(dataset, num_workers=8, batch_size=batch_size, shuffle=True)
-logger = ImageLogger(batch_frequency=logger_freq, split="12e")
+logger = ImageLogger(batch_frequency=logger_freq, split="ipadapter")
 trainer = pl.Trainer(
     gpus=n_gpus,
     strategy="ddp",

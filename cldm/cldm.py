@@ -45,13 +45,10 @@ class ControlledUnetModel(UNetModel):
 
 
 class MultiControlledUnetModel(UNetModel):
-    def __init__(self, is_adapter=False, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for m in self.modules():
-            if isinstance(m, BasicTransformerBlock):
-                m.ip_adapter = is_adapter
         
-    def forward(self, x, timesteps=None, caption=None, subject=None, control=None, only_mid_control=False, **kwargs):
+    def forward(self, x, timesteps=None, caption=None, subject=None, only_mid_control=False, **kwargs):
         hs = []
         with torch.no_grad():
             t_emb = timestep_embedding(timesteps, self.model_channels, repeat_only=False)
@@ -62,14 +59,8 @@ class MultiControlledUnetModel(UNetModel):
                 hs.append(h)
             h = self.middle_block(h, emb, caption, subject)
 
-        if control is not None:
-            h += control.pop()
-
         for i, module in enumerate(self.output_blocks):
-            if only_mid_control or control is None:
-                h = torch.cat([h, hs.pop()], dim=1)
-            else:
-                h = torch.cat([h, hs.pop() + control.pop()], dim=1)
+            h = torch.cat([h, hs.pop()], dim=1)
             h = module(h, emb, caption, subject)
 
         h = h.type(x.dtype)
