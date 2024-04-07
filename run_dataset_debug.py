@@ -35,7 +35,7 @@ DConf = OmegaConf.load('./configs/datasets.yaml')
 # dataset3 = VIPSegDataset(**DConf.Train.VIPSeg) 
 # dataset4 = YoutubeVISDataset(**DConf.Train.YoutubeVIS) 
 # dataset5 = MVImageNetDataset(**DConf.Train.MVImageNet)
-# dataset6 = SAMDataset(**DConf.Train.SAM)
+dataset6 = SAMDataset(**DConf.Train.SAM)
 # dataset7 = UVODataset(**DConf.Train.UVO.train)
 # dataset8 = VitonHDDataset(**DConf.Train.VitonHD)
 # dataset9 = UVOValDataset(**DConf.Train.UVO.val)
@@ -47,10 +47,9 @@ DConf = OmegaConf.load('./configs/datasets.yaml')
 # dataset15 = PSGDataset()
 # dataset16 = PVSGDataset(data_root="/data00/OpenPVSG/data")
 # dataset17 = VGDataset()
-# dataset18 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
-dataset19 = CocoValDataset(**DConf.Train.COCOVal)
-
-dataset = dataset19
+dataset18 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
+# dataset19 = CocoValDataset(**DConf.Train.COCOVal)
+dataset = dataset6
 
 def find_save_path(is_mask):
     image_dir = "examples/cocoval/ref"
@@ -72,7 +71,7 @@ def save_image_mask_pair(image, mask):
     cv2.imwrite(image_path, image)
     cv2.imwrite(mask_path, mask)
 
-def vis_sample(item):
+def make_test_case(item):
     ref = torch.cat([item['ref'][:, i] for i in range(2)], dim=2) * 255
     tar = item['jpg'] * 127.5 + 127.5
     hint = item['hint'] * 127.5 + 127.5
@@ -116,8 +115,25 @@ def vis_sample(item):
     # anno['caption'] = item['caption'][0]
     # anno['chosen_objs'] = item['chosen_objs'].tolist()[0]
     # annotations.append(anno)
+    
+def vis_sample(item):
+    ref: torch.Tensor = item['ref'] # (1, 2, 224, 224, 3)
+    ref = ref.transpose(1, 2).flatten(2, 3) * 255
+    tar = item['jpg'] * 127.5 + 127.5
+    hint = item['hint'] * 127.5 + 127.5
+    step = item['time_steps']
+    print(item['ref'].shape, tar.shape, hint.shape, step.shape)
 
-
+    ref = ref[0].numpy()
+    tar = tar[0].numpy()
+    hint_image = hint[0, :, :, :-1].numpy()
+    hint_mask = hint[0, :, :, -1].numpy()
+    hint_mask = np.stack([hint_mask, hint_mask, hint_mask],-1)
+    ref = cv2.resize(ref.astype(np.uint8), (1024, 512))
+    vis = cv2.hconcat([ref.astype(np.float32), hint_image.astype(np.float32), hint_mask.astype(np.float32), tar.astype(np.float32)])
+    cv2.imwrite('sample_vis.jpg', vis[:, :, ::-1])
+    print(item['caption'][0])
+    
 dataloader = DataLoader(dataset, num_workers=8, batch_size=1, shuffle=True)
 print('len dataloader: ', len(dataloader))
 annotations = []

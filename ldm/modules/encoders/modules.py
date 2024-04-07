@@ -350,7 +350,7 @@ class FrozenMultiDoorEncoder(AbstractEncoder):
             self.freeze()
         self.image_mean = torch.tensor([0.485, 0.456, 0.406]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
         self.image_std =  torch.tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
-        self.obj_emb = torch.nn.Parameter(torch.randn(2))     
+        self.obj_emb = torch.nn.Parameter(torch.randn(2, 1536))     
         self.projector = nn.Linear(1536, 1024)
         self.token_select = TokenSelection(k=24)
 
@@ -379,7 +379,7 @@ class FrozenMultiDoorEncoder(AbstractEncoder):
         clstoken = clstoken.reshape(b, n, 1, -1)
         selected_patchtokens = self.token_select(patchtokens)   # (b, n, k, 1536)
         image_features = torch.cat((clstoken, selected_patchtokens), dim=-2) # (b, n, k+1, 1536)
-        emb = self.obj_emb.view(1, 2, 1, 1)
+        emb = self.obj_emb.view(1, 2, 1, 1536)
         image_features = image_features + emb
         hint = self.projector(image_features)
         return hint.flatten(1, 2)

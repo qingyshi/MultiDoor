@@ -29,25 +29,23 @@ class CocoDataset(BaseDataset):
         caption, chosen_objs = self.load_caption(path)
         image_path = os.path.join(self.root, path)
         img = np.array(Image.open(image_path).convert("RGB"))
+        sorted_annotation = sorted(coco_annotation, key=lambda x: x["area"], reverse=True)
 
-        # num_objs = len(coco_annotation)
-        # if num_objs >= 2:
-        #     chosen_objs: np.ndarray = np.random.choice(list(range(num_objs)), 2, replace=False)
-        # else:
-        #     raise Exception
+        num_objs = len(sorted_annotation)
+        if num_objs >= 2:
+            chosen_objs = [0, 1]
+        else:
+            raise Exception
         
         names = []
         masks = []
         for i, idx in enumerate(chosen_objs):
-            ann = coco_annotation[idx]
-            if 'segmentation' in ann:
-                mask = self.coco.annToMask(ann)
-                masks.append(mask)
-            else:
-                masks.append(np.zeros((img.height, img.width)))
+            ann = sorted_annotation[idx]
+            mask = self.coco.annToMask(ann)
+            masks.append(mask)
             names.append(self.cat_to_names[ann['category_id']])
         assert len(names) == 2
-        item_with_collage = self.process_pairs(ref_image=img, ref_mask=masks, 
+        item_with_collage = self.process_pairs(ref_image=img, ref_mask=masks,               
                                                tar_image=img.copy(), tar_mask=masks.copy())
         sampled_time_steps = self.sample_timestep()
         

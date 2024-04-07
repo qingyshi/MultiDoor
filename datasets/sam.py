@@ -18,9 +18,7 @@ class SAMDataset(BaseDataset):
         self.register_subset(sub3)
         self.register_subset(sub4)
         with open(caption, 'r') as f:
-            caption = json.load(f)
-            
-        self.caption = caption
+            self.caption = json.load(f)
         self.size = (512,512)
         self.clip_size = (224,224)
         self.dynamic = 0
@@ -35,7 +33,7 @@ class SAMDataset(BaseDataset):
         json_path = self.data[idx]
         image_path = json_path.replace('.json', '.jpg')
         image_id = os.path.basename(image_path)
-        caption = self.load_caption(image_id)
+        caption, _ = self.load_caption(image_id)
 
         with open(json_path, 'r') as json_file:
             data = json.load(json_file)
@@ -49,8 +47,6 @@ class SAMDataset(BaseDataset):
 
         if len(valid_ids) >= 2:
             chosen_id = np.random.choice(valid_ids, 2, replace=False)
-        elif len(valid_ids) == 1:
-            chosen_id = valid_ids
         else:
             raise Exception
         
@@ -63,22 +59,22 @@ class SAMDataset(BaseDataset):
         
         ref_mask = masks
         tar_mask = masks
-        item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
+        item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask, max_ratio=0.8)
         sampled_time_steps = self.sample_timestep()
         item_with_collage['time_steps'] = sampled_time_steps
-        item_with_collage['img_path'] = image_path
+        # item_with_collage['image_path'] = image_path
         item_with_collage['caption'] = caption
         return item_with_collage
 
     def __len__(self):
         return 20000
 
-    def check_region_size(self, image, yyxx, ratio, mode = 'max'):
+    def check_region_size(self, image, yyxx, ratio, mode='max'):
         pass_flag = True
         H,W = image.shape[0], image.shape[1]
         H,W = H * ratio, W * ratio
-        y1,y2,x1,x2 = yyxx
-        h,w = y2-y1,x2-x1
+        y1, y2, x1, x2 = yyxx
+        h, w = y2-y1, x2-x1
         if mode == 'max':
             if h > H or w > W:
                 pass_flag = False

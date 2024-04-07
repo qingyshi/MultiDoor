@@ -3,6 +3,7 @@ import einops
 import numpy as np
 import torch
 import random
+from torch.nn import functional as F
 from pytorch_lightning import seed_everything
 from cldm.model import create_model, load_state_dict
 from cldm.ddim_hacked import DDIMSampler
@@ -315,6 +316,15 @@ def crop_back(pred, tar_image, extra_sizes, tar_box_yyxx_crop):
     gen_image[y1+m: y2-m, x1+m: x2-m, :] =  pred[m:-m, m:-m]
     return gen_image
 
+def encode_inpainting(model: MultiAdapter, control):
+    inpaint = control[:, :3, :, :]
+    mask = control[:, -1, :, :].unsqueeze(1)
+    inpaint = model.encode_first_stage(inpaint)  # (b, 4, 64, 64)
+    inpaint = model.get_first_stage_encoding(inpaint).detach()
+    b, _, h, w = inpaint.shape
+    mask = F.interpolate(mask, size=(h, w), mode="nearest")
+    return torch.cat([inpaint, mask], dim=1)
+
 
 def inference(ref_image, ref_mask, tar_image, tar_mask, caption, need_process, image_guidance=False, guidance_scale=5.0):
     '''
@@ -358,12 +368,13 @@ def inference(ref_image, ref_mask, tar_image, tar_mask, caption, need_process, i
     control = torch.from_numpy(hint.copy()).float().cuda() 
     control = torch.stack([control for _ in range(num_samples)], dim=0)
     control = einops.rearrange(control, 'b h w c -> b c h w').clone()
+    control = encode_inpainting(model, control)
 
     # dino_input.shape: (n, 224, 224, 3)
     dino_input = torch.from_numpy(ref).float().cuda() 
     dino_input = torch.stack([dino_input for _ in range(num_samples)], dim=0)
     dino_input = dino_input.clone()
-    img_token = model.img_encoder(dino_input)   # (b, n * 256, 1024)
+    img_token = model.image_encoder(dino_input)   # (b, n * 25, 1024)
 
     guess_mode = False
     H, W = 512, 512
@@ -373,11 +384,11 @@ def inference(ref_image, ref_mask, tar_image, tar_mask, caption, need_process, i
     uncond = model.get_unconditional_conditioning(num_samples, image_guidance=image_guidance) # (b, 77, 1024) or (b, 514, 1024)
     # caption_embedding: (b, 77, 1024)
     
-    cond = {"c_concat": [control], "c_crossattn": [cond_text], "img_token": [img_token]}
+    cond = {"c_concat": control, "c_crossattn": cond_text, "image_token": img_token}
     if image_guidance:
-        un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [cond_text], "img_token": [uncond]}
+        un_cond = {"c_concat": None if guess_mode else control, "c_crossattn": cond_text, "image_token": uncond}
     else:
-        un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [uncond], "img_token": [img_token]}
+        un_cond = {"c_concat": None if guess_mode else control, "c_crossattn": uncond, "image_token": img_token}
     shape = (4, H // 8, W // 8)
 
     if save_memory:

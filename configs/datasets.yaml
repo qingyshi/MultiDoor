@@ -3,24 +3,24 @@ Train:
     image_dir: /data00/multidoor_dataset/youtube_vos_2019/train/JPEGImages/
     anno: /data00/multidoor_dataset/youtube_vos_2019/train/Annotations/
     meta: /data00/multidoor_dataset/youtube_vos_2019/train/meta.json
-    caption: /data00/multidoor_dataset/caption/caption_ytvos.json
+    caption: /data/home/sqy/PythonProjects/multimodal/LLaVA/caption_ytvos19.json
 
   YoutubeVIS:
     image_dir: /data00/datasets/youtube_vis_2019/train/JPEGImages/
     anno: /data00/datasets/youtube_vis_2019/train/Annotations/
     meta: /data00/datasets/youtube_vis_2019/train/meta.json
-    caption: /data00/multidoor_dataset/caption/caption_ytvis.json
+    caption: /data/home/sqy/PythonProjects/multimodal/LLaVA/caption_ytvis19.json
 
   YoutubeVIS21:
     root: /data00/multidoor_dataset/youtube_vis_2021/train/JPEGImages/
     anno: /data00/multidoor_dataset/youtube_vis_2021/train/instances.json
-    caption: /data00/multidoor_dataset/caption/caption_ytvis21.json
+    caption: /data/home/sqy/PythonProjects/multimodal/LLaVA/caption_ytvis21.json
 
   VIPSeg:
     image_dir: /data00/multidoor_dataset/VIPSeg/VIPSeg_720P/images/
     anno: /data00/multidoor_dataset/VIPSeg/VIPSeg_720P/panomasksRGB/
     meta: /data00/multidoor_dataset/VIPSeg/VIPSeg_720P/panoptic_gt_VIPSeg.json
-    caption: ./data/caption_vipseg.json
+    caption: /data/home/sqy/PythonProjects/multimodal/LLaVA/caption_vipseg.json
 
   UVO:
     train:
@@ -61,7 +61,7 @@ Train:
     sub2: /data00/multidoor_dataset/sam/0001
     sub3: /data00/multidoor_dataset/sam/0002
     sub4: /data00/multidoor_dataset/sam/0004
-    caption: ./data/caption_sam.json
+    caption: /data/home/sqy/PythonProjects/multimodal/LLaVA/caption_sam.json
 
   Saliency:
     MSRA_root: path/Saliency/MSRA10K_Imgs_GT/
@@ -72,7 +72,7 @@ Train:
   COCO:
     root: /data00/datasets/coco/train2017/
     annotation: /data00/datasets/coco/annotations/instances_train2017.json
-    caption: /data00/multidoor_dataset/caption/caption_coco.json
+    caption: /data/home/sqy/PythonProjects/multimodal/LLaVA/caption_coco.json
 
   COCOVal:
     root: /data00/datasets/coco/val2017
