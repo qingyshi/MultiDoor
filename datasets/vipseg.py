@@ -61,23 +61,35 @@ class VIPSegDataset(BaseDataset):
             caption = anno.get('caption')
             chosen_objs = anno.get('chosen_objs')
             start_end_frames = anno.get('start_end_frames')
-        return caption, chosen_objs, start_end_frames
+            nouns = anno.get('nouns')
+            predicate = anno.get('predicate')
+        return caption, chosen_objs, start_end_frames, nouns, predicate
 
     def get_sample(self, idx):
         video_name = self.data[idx]  
-        caption, chosen_objs, start_end_frames = self.load_caption(video_name)
+        caption, chosen_objs, start_end_frames, nouns, predicate = self.load_caption(video_name)
         start_frame_index, end_frame_index = start_end_frames
-            
+        
         ann_per_frame = self.vid_id2frame_ann[video_name]     # list of every frames
+        end_frame_ann = ann_per_frame[end_frame_index]
+        
         video_path = os.path.join(self.image_root, video_name)
         frames = os.listdir(video_path)
+        chosen_cat_id = []
+        for single_obj in chosen_objs:
+            obj_ids = [obj['id'] for obj in end_frame_ann['segments_info']]
+            segment_info = end_frame_ann['segments_info'][obj_ids.index(single_obj)]
+            chosen_cat_id.append(segment_info['category_id'])
+              
+        names = [self.id2name[cat_id] for cat_id in chosen_cat_id]
+        nouns = self.check_names_in_nouns(names, nouns, caption)
+        batch = self.process_nouns_in_caption(nouns, caption)
 
         # Sampling frames
         # min_interval = len(frames) // 100
         # start_frame_index = np.random.randint(low=0, high=len(frames) - min_interval)
         # end_frame_index = start_frame_index + np.random.randint(min_interval, len(frames) - start_frame_index)
         # end_frame_index = min(end_frame_index, len(frames) - 1)
-        end_frame_ann = ann_per_frame[end_frame_index]
         # start_end_frames = [int(start_frame_index), int(end_frame_index)]
         
         # Get image path
@@ -113,13 +125,6 @@ class VIPSegDataset(BaseDataset):
         # else:
         #     raise Exception
         
-        chosen_cat_id = []
-        for single_obj in chosen_objs:
-            obj_ids = [obj['id'] for obj in end_frame_ann['segments_info']]
-            segment_info = end_frame_ann['segments_info'][obj_ids.index(single_obj)]
-            chosen_cat_id.append(segment_info['category_id'])
-              
-        names = [self.id2name[cat_id] for cat_id in chosen_cat_id]
         ref_mask = [ref_mask == single_id for single_id in chosen_objs]
         tar_mask = [tar_mask == single_id for single_id in chosen_objs]
         # len_mask = len(self.check_connect(ref_mask[0].astype(np.uint8)))
@@ -134,7 +139,7 @@ class VIPSegDataset(BaseDataset):
         # item_with_collage['names'] = names
         # item_with_collage['chosen_objs'] = chosen_objs
         # item_with_collage['start_end_frames'] = start_end_frames
-        item_with_collage['caption'] = caption
+        item_with_collage.update(batch)
         return item_with_collage
 
     def check_connect(self, mask):

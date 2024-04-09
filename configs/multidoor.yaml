@@ -1,5 +1,5 @@
 model:
-  target: cldm.multiadapter.MultiAdapter
+  target: cldm.multidoor.MultiDoor
   params:
     linear_start: 0.00085
     linear_end: 0.0120
@@ -8,8 +8,12 @@ model:
     timesteps: 1000
     first_stage_key: "jpg"
     cond_stage_key: "caption"
-    ref_image_key: "ref"
-    control_image_key: "hint"
+    image_key: "ref"
+    inpaint_image_key: "hint"
+    object_localization: True
+    object_localization_weight: 0.001
+    object_localization_threshold: 1.0
+    object_localization_normalize: false
     image_size: 64
     channels: 4
     cond_stage_trainable: false
@@ -19,7 +23,7 @@ model:
     use_ema: False
 
     unet_config:
-      target: cldm.cldm.MultiControlledUnetModel
+      target: ldm.modules.diffusionmodules.openaimodel.UNetModel
       params:
         use_checkpoint: True
         image_size: 64 # unused
@@ -65,6 +69,12 @@ model:
       weight: /data00/sqy/checkpoints/dinov2/dinov2_vitg14_pretrain.pth
     
     cond_stage_config:
-      target: ldm.modules.encoders.modules.FrozenOpenCLIPEmbedder
+      target: cldm.multidoor.MultiDoorTextEncoder
       params:
-        version: /data00/sqy/checkpoints/laion/CLIP-ViT-H-14-laion2B-s32B-b79K/open_clip_pytorch_model.bin
+        model_name_or_path: /data00/sqy/checkpoints/stable-diffusion-2-1-base
+
+    fusion_stage_config:
+      target: cldm.multidoor.MultiDoorPostfuseModule
+      params:
+        text_token_dim: 1024
+        image_token_dim: 1536

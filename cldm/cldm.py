@@ -44,28 +44,6 @@ class ControlledUnetModel(UNetModel):
         return self.out(h)
 
 
-class MultiControlledUnetModel(UNetModel):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        
-    def forward(self, x, timesteps=None, caption=None, subject=None, only_mid_control=False, **kwargs):
-        hs = []
-        with torch.no_grad():
-            t_emb = timestep_embedding(timesteps, self.model_channels, repeat_only=False)
-            emb = self.time_embed(t_emb)
-            h = x.type(self.dtype)
-            for module in self.input_blocks:
-                h = module(h, emb, caption, subject)
-                hs.append(h)
-            h = self.middle_block(h, emb, caption, subject)
-
-        for i, module in enumerate(self.output_blocks):
-            h = torch.cat([h, hs.pop()], dim=1)
-            h = module(h, emb, caption, subject)
-
-        h = h.type(x.dtype)
-        return self.out(h)
-
 class ControlNet(nn.Module):
     def __init__(
             self,

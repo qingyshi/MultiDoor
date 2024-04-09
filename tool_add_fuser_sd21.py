@@ -25,7 +25,6 @@ def get_node_name(name, parent_name):
         return False, ''
     return True, name[len(parent_name):]
 
-
 model = create_model(config_path='./configs/multidoor.yaml')
 
 pretrained_weights = torch.load(input_path)
@@ -39,10 +38,6 @@ for k in scratch_dict.keys():
     if "input_blocks.0" in k:
         print(f"skip weights: {k}")
         continue
-    elif "to_k_ip" in k:
-        copy_k = k.replace("to_k_ip", "to_k")
-    elif "to_v_ip" in k:
-        copy_k = k.replace("to_v_ip", "to_v")
     else:
         copy_k = k
       

@@ -7,7 +7,6 @@ from einops import rearrange, repeat
 from typing import Optional, Any
 
 from ldm.modules.diffusionmodules.util import checkpoint
-from ldm.modules.ip_adapter import AttnProcessor, IPAttnProcessor
 
 
 try:
@@ -169,7 +168,7 @@ class CrossAttention(nn.Module):
         context = default(context, x)
         k = self.to_k(context)
         v = self.to_v(context)
-
+        bsz, n, _ = q.shape
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q, k, v))
 
         # force cast to fp32 to avoid overflowing
@@ -191,8 +190,8 @@ class CrossAttention(nn.Module):
         # attention, what we cannot get enough of
         sim = sim.softmax(dim=-1)
 
-        if self.cross_attn_map_store is not None:
-            self.cross_attn_map_store(sim)
+        if self.cross_attn_map_store is not None and sim.shape[1] <= 1024:
+            self.cross_attn_map_store(sim.reshape(bsz, h, n, -1))
         
         out = einsum('b i j, b j d -> b i d', sim, v)
         out = rearrange(out, '(b h) n d -> b n (h d)', h=h)
@@ -329,13 +328,14 @@ class BasicTransformerBlock(nn.Module):
                  disable_self_attn=False):
         super().__init__()
         attn_mode = "softmax-xformers" if XFORMERS_IS_AVAILBLE else "softmax"
+        attn_mode = "softmax"
         assert attn_mode in self.ATTENTION_MODES
         attn_cls = self.ATTENTION_MODES[attn_mode]
         self.disable_self_attn = disable_self_attn
         self.attn1 = attn_cls(query_dim=dim, heads=n_heads, dim_head=d_head, dropout=dropout,
                               context_dim=context_dim if self.disable_self_attn else None)  # is a self-attention if not self.disable_self_attn
         self.ff = FeedForward(dim, dropout=dropout, glu=gated_ff)
-        self.attn2 = IPAdapter(query_dim=dim, context_dim=context_dim,
+        self.attn2 = attn_cls(query_dim=dim, context_dim=context_dim,
                               heads=n_heads, dim_head=d_head, dropout=dropout)  # is self-attn if context is none
 
         self.norm1 = nn.LayerNorm(dim)
@@ -343,12 +343,12 @@ class BasicTransformerBlock(nn.Module):
         self.norm3 = nn.LayerNorm(dim)
         self.checkpoint = checkpoint
 
-    def forward(self, x, caption=None, subject=None):
-        return checkpoint(self._forward, (x, caption, subject), self.parameters(), self.checkpoint)
+    def forward(self, x, context=None):
+        return checkpoint(self._forward, (x, context), self.parameters(), self.checkpoint)
         
-    def _forward(self, x, caption=None, subject=None):
-        x = self.attn1(self.norm1(x), context=caption if self.disable_self_attn else None) + x
-        x = self.attn2(self.norm2(x), context=caption, subject=subject) + x
+    def _forward(self, x, context=None):
+        x = self.attn1(self.norm1(x), context=context if self.disable_self_attn else None) + x
+        x = self.attn2(self.norm2(x), context=context) + x
         x = self.ff(self.norm3(x)) + x
         return x
 
@@ -396,13 +396,8 @@ class SpatialTransformer(nn.Module):
             self.proj_out = zero_module(nn.Linear(in_channels, inner_dim))
         self.use_linear = use_linear
 
-    def forward(self, x, caption=None, subject=None):
-        # note: if no context is given, cross-attention defaults to self-attention
-        if not isinstance(subject, list):
-            subject = [subject]
-        if not isinstance(caption, list):
-            caption = [caption]    
-        
+    def forward(self, x, context=None):
+        # note: if no context is given, cross-attention defaults to self-attention  
         b, c, h, w = x.shape
         x_in = x
         x = self.norm(x)
@@ -412,7 +407,7 @@ class SpatialTransformer(nn.Module):
         if self.use_linear:
             x = self.proj_in(x)
         for i, block in enumerate(self.transformer_blocks):
-            x = block(x, caption=caption[i], subject=subject[i])
+            x = block(x, context=context)
         if self.use_linear:
             x = self.proj_out(x)
         x = rearrange(x, 'b (h w) c -> b c h w', h=h, w=w).contiguous()

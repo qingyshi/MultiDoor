@@ -14,7 +14,7 @@ Train:
   YoutubeVIS21:
     root: /data00/multidoor_dataset/youtube_vis_2021/train/JPEGImages/
     anno: /data00/multidoor_dataset/youtube_vis_2021/train/instances.json
-    caption: /data/home/sqy/PythonProjects/multimodal/LLaVA/caption_ytvis21.json
+    caption: /data/home/sqy/PythonProjects/multimodal/LLaVA/composer_caption/composer_caption_ytvis21.json
 
   VIPSeg:
     image_dir: /data00/multidoor_dataset/VIPSeg/VIPSeg_720P/images/
@@ -72,7 +72,7 @@ Train:
   COCO:
     root: /data00/datasets/coco/train2017/
     annotation: /data00/datasets/coco/annotations/instances_train2017.json
-    caption: /data/home/sqy/PythonProjects/multimodal/LLaVA/caption_coco.json
+    caption: /data/home/sqy/PythonProjects/multimodal/LLaVA/composer_caption/composer_caption_coco.json
 
   COCOVal:
     root: /data00/datasets/coco/val2017

@@ -8,7 +8,7 @@ from pytorch_lightning import seed_everything
 from cldm.model import create_model, load_state_dict
 from cldm.ddim_hacked import DDIMSampler
 from cldm.hack import disable_verbosity, enable_sliced_attention
-from cldm.multiadapter import MultiAdapter
+from cldm.multidoor import MultiDoor
 from datasets.data_utils import * 
 cv2.setNumThreads(0)
 cv2.ocl.setUseOpenCL(False)
@@ -28,7 +28,7 @@ config = OmegaConf.load('./configs/inference.yaml')
 model_ckpt = config.pretrained_model
 model_config = config.config_file
 
-model: MultiAdapter = create_model(model_config).cpu()
+model: MultiDoor = create_model(model_config).cpu()
 model.load_state_dict(load_state_dict(model_ckpt, location='cuda'))
 model = model.cuda()
 ddim_sampler = DDIMSampler(model)
@@ -316,7 +316,7 @@ def crop_back(pred, tar_image, extra_sizes, tar_box_yyxx_crop):
     gen_image[y1+m: y2-m, x1+m: x2-m, :] =  pred[m:-m, m:-m]
     return gen_image
 
-def encode_inpainting(model: MultiAdapter, control):
+def encode_inpainting(model: MultiDoor, control):
     inpaint = control[:, :3, :, :]
     mask = control[:, -1, :, :].unsqueeze(1)
     inpaint = model.encode_first_stage(inpaint)  # (b, 4, 64, 64)

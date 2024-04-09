@@ -35,7 +35,7 @@ DConf = OmegaConf.load('./configs/datasets.yaml')
 # dataset3 = VIPSegDataset(**DConf.Train.VIPSeg) 
 # dataset4 = YoutubeVISDataset(**DConf.Train.YoutubeVIS) 
 # dataset5 = MVImageNetDataset(**DConf.Train.MVImageNet)
-dataset6 = SAMDataset(**DConf.Train.SAM)
+# dataset6 = SAMDataset(**DConf.Train.SAM)
 # dataset7 = UVODataset(**DConf.Train.UVO.train)
 # dataset8 = VitonHDDataset(**DConf.Train.VitonHD)
 # dataset9 = UVOValDataset(**DConf.Train.UVO.val)
@@ -43,13 +43,13 @@ dataset6 = SAMDataset(**DConf.Train.SAM)
 # dataset11 = FashionTryonDataset(**DConf.Train.FashionTryon)
 # dataset12 = LvisDataset(**DConf.Train.Lvis)
 # dataset13 = CocoDataset(**DConf.Train.COCO)
-# dataset14 = HICODataset(**DConf.Train.HICO)
-# dataset15 = PSGDataset()
-# dataset16 = PVSGDataset(data_root="/data00/OpenPVSG/data")
+dataset14 = HICODataset(**DConf.Train.HICO)
+dataset15 = PSGDataset()
+dataset16 = PVSGDataset(data_root="/data00/OpenPVSG/data")
 # dataset17 = VGDataset()
-dataset18 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
+# dataset18 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
 # dataset19 = CocoValDataset(**DConf.Train.COCOVal)
-dataset = dataset6
+dataset = dataset16
 
 def find_save_path(is_mask):
     image_dir = "examples/cocoval/ref"

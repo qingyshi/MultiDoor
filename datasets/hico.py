@@ -8,6 +8,7 @@ from copy import deepcopy
 
 class HICODataset(BaseDataset):
     def __init__(self, root, image_dir, mask_dir, annotation):
+        super().__init__()
         self.root = root
         self.image_dir = os.path.join(root, image_dir)
         self.mask_dir = os.path.join(root, mask_dir)
@@ -23,7 +24,7 @@ class HICODataset(BaseDataset):
         self.dynamic = 0
     
     def __len__(self):
-        return 20000
+        return 40000
     
     def sample_timestep(self, max_step=1000):
         step_start = 0
@@ -40,7 +41,15 @@ class HICODataset(BaseDataset):
         chosen_ids = int(np.random.choice(num_relationship, 1))
         verb: str = self.ids2verb[verbs[chosen_ids]].replace("_", "ing ")
         obj: str = self.ids2obj[objs[chosen_ids]].replace("_", " ")
-        caption = f"The person {verb} the {obj}"
+        caption = f"The person {verb} the {obj}."
+        names = ["person", obj]
+        nouns = []
+        for name in names:
+            start = caption.index(name)
+            end = start + len(name)
+            noun = dict(word=name, start=start, end=end)
+            nouns.append(noun)
+        batch = self.process_nouns_in_caption(nouns, caption)
         
         image_path = os.path.join(self.image_dir, filename)
         subject_path = os.path.join(self.mask_dir, filename, str(chosen_ids), "subject.png")
@@ -60,5 +69,5 @@ class HICODataset(BaseDataset):
         
         item_with_collage['time_steps'] = sampled_time_steps
         # item_with_collage['image_path'] = image_path
-        item_with_collage['caption'] = caption
+        item_with_collage.update(batch)
         return item_with_collage

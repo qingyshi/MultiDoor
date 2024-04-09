@@ -797,6 +797,7 @@ class LatentDiffusion(DDPM):
             else:
                 c = xc
             if bs is not None:
+                c = c.last_hidden_state
                 c = c[:bs]
 
             if self.use_positional_encodings:

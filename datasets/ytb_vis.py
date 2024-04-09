@@ -49,7 +49,7 @@ class YoutubeVISDataset(BaseDataset):
     
     def get_sample(self, idx):
         video_id = list(self.records.keys())[idx]
-        caption, chosen_objs = self.load_caption(video_id)
+        caption, chosen_objs, nouns, predicate = self.load_caption(video_id)
         
         # obj_list = list(self.records[video_id]["objects"].keys())
         # if len(obj_list) >= 2:
@@ -60,6 +60,9 @@ class YoutubeVISDataset(BaseDataset):
         frames = [self.records[video_id]["objects"][str(single_id)]["frames"] for single_id in chosen_objs]
         names = [self.records[video_id]["objects"][str(single_id)]["category"] for single_id in chosen_objs]
         frames = np.intersect1d(*frames)
+        
+        nouns = self.check_names_in_nouns(names, nouns, caption)
+        batch = self.process_nouns_in_caption(nouns, caption)
 
         # Sampling frames
         min_interval = len(frames) // 10
@@ -98,7 +101,7 @@ class YoutubeVISDataset(BaseDataset):
         # item_with_collage['names'] = names
         # item_with_collage['image_path'] = tar_image_path
         # item_with_collage['video_id'] = video_id
-        item_with_collage['caption'] = caption
+        item_with_collage.update(batch)
         return item_with_collage
 
 

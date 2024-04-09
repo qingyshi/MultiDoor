@@ -6,7 +6,7 @@ from pytorch_lightning import seed_everything
 from cldm.model import create_model, load_state_dict
 from cldm.ddim_hacked import DDIMSampler
 from cldm.hack import disable_verbosity, enable_sliced_attention
-from cldm.multiadapter import MultiAdapter
+from cldm.multidoor import MultiDoor
 from datasets.data_utils import * 
 cv2.setNumThreads(0)
 cv2.ocl.setUseOpenCL(False)
@@ -27,7 +27,7 @@ config = OmegaConf.load('./configs/inference.yaml')
 model_ckpt =  config.pretrained_model
 model_config = config.config_file
 
-model: MultiAdapter = create_model(model_config).cpu()
+model: MultiDoor = create_model(model_config).cpu()
 model.load_state_dict(load_state_dict(model_ckpt, location='cuda'))
 model = model.cuda()
 ddim_sampler = DDIMSampler(model)

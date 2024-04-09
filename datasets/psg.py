@@ -11,6 +11,7 @@ from .base import BaseDataset
 
 class PSGDataset(BaseDataset):
     def __init__(self, root="/data00/datasets/coco", relation="/data00/psg/psg.json"):
+        super().__init__()
         self.root = root
         self.ann = json.load(open(relation, "r"))
         self.data = self.ann.get('data')
@@ -44,6 +45,14 @@ class PSGDataset(BaseDataset):
                       segments_info[relation[1]]['id']]
         predicate = self.id2predicate[relation[2]]
         caption = f'The {objects[0]} is {predicate} the {objects[1]}.'
+        names = objects
+        nouns = []
+        for name in names:
+            start = caption.index(name)
+            end = start + len(name)
+            noun = dict(word=name, start=start, end=end)
+            nouns.append(noun)
+        batch = self.process_nouns_in_caption(nouns, caption)
         
         masks = [mask == id for id in objects_id]
         item_with_collage = self.process_pairs(ref_image=img, ref_mask=masks, 
@@ -52,7 +61,7 @@ class PSGDataset(BaseDataset):
         
         item_with_collage['time_steps'] = sampled_time_steps
         # item_with_collage['image_path'] = image_path
-        item_with_collage['caption'] = caption
+        item_with_collage.update(batch)
         return item_with_collage
     
     def check_isthing(self, relations, segments_info):

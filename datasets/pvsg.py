@@ -8,6 +8,7 @@ from .base import BaseDataset
 
 class PVSGDataset(BaseDataset):
     def __init__(self, data_root="/data00/OpenPVSG/data"):
+        super().__init__()
         self.data_root = data_root
         with open(os.path.join(data_root, 'pvsg.json'), 'r') as f:
             anno = json.load(f)
@@ -38,8 +39,15 @@ class PVSGDataset(BaseDataset):
         objects_ids = relation[:2]
         object_classes = [objects[ids - 1]['category'] for ids in objects_ids]
         predicate = relation[2]
-        caption = f'The {object_classes[0]} is {predicate} the {object_classes[1]}'
-        
+        caption = f'The {object_classes[0]} is {predicate} the {object_classes[1]}.'
+        names = object_classes
+        nouns = []
+        for name in names:
+            start = caption.index(name)
+            end = start + len(name)
+            noun = dict(word=name, start=start, end=end)
+            nouns.append(noun)
+        batch = self.process_nouns_in_caption(nouns, caption)
         # random pick two frames
         num_clip = len(relation[3])
         clip = relation[3][np.random.choice(num_clip)]
@@ -74,7 +82,7 @@ class PVSGDataset(BaseDataset):
         
         item_with_collage['time_steps'] = sampled_time_steps
         # item_with_collage['image_path'] = tar_image_path
-        item_with_collage['caption'] = caption
+        item_with_collage.update(batch)
         return item_with_collage
         
     def check_isthing(self, relations, objects):
