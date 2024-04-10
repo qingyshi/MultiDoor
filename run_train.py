@@ -69,4 +69,4 @@ trainer = pl.Trainer(
 
 
 # Train!
-trainer.fit(model, dataloader)
+trainer.fit(model, train_dataloader=dataloader, val_dataloaders=None)

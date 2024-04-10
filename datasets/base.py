@@ -267,7 +267,7 @@ class BaseDataset(Dataset):
                 extra_sizes=np.array([H1, W1, H2, W2]), 
                 tar_box_yyxx_crop=np.array(tar_box_yyxx_crop),
                 target_masks=tar_masks, # (n, 512, 512)
-                ) 
+        ) 
         return item
 
     def process_nouns_in_caption(self, nouns, caption):

@@ -229,7 +229,7 @@ class MultiDoor(LatentDiffusion):
         control = control.to(self.device)
         control = rearrange(control, 'b h w c -> b c h w')
         control = control.to(memory_format=torch.contiguous_format).float()
-        self.time_steps = batch['time_steps']
+        self.time_steps = batch.get('time_steps')
         # cond['c_crossattn'].shape: (b, 77, 1024)
         inpaint = control[:, :3, :, :]
         mask = control[:, -1, :, :].unsqueeze(1)
@@ -356,7 +356,7 @@ class MultiDoor(LatentDiffusion):
                 log["denoise_row"] = denoise_grid
 
         if unconditional_guidance_scale > 1.0:
-            uc_cross = self.get_unconditional_conditioning(N).last_hidden_state
+            uc_cross = self.get_unconditional_conditioning(N)
             uc_cat = c_cat  # torch.zeros_like(c_cat)
             uc_full = {"c_concat": uc_cat, "c_crossattn": uc_cross}
             samples_cfg, _ = self.sample_log(cond={"c_concat": c_cat, "c_crossattn": context},
@@ -373,5 +373,9 @@ class MultiDoor(LatentDiffusion):
     @torch.no_grad()
     def get_unconditional_conditioning(self, num_samples):
         uncond = torch.tensor([self.pad_token_id] * num_samples).unsqueeze(1).repeat(1, 77).to("cuda")
-        uncond = self.cond_stage_model(uncond)
+        uncond = self.cond_stage_model(uncond).last_hidden_state
         return uncond   # (b, 77, 1024)
+
+    @torch.no_grad()
+    def validation_step(self, batch, batch_idx):
+        pass

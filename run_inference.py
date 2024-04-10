@@ -2,7 +2,6 @@ import cv2
 import einops
 import numpy as np
 import torch
-import random
 from torch.nn import functional as F
 from pytorch_lightning import seed_everything
 from cldm.model import create_model, load_state_dict
@@ -16,6 +15,7 @@ import albumentations as A
 from omegaconf import OmegaConf
 from PIL import Image
 import os
+from transformers import CLIPTokenizer
 
 
 save_memory = False
@@ -45,6 +45,80 @@ def aug_data_mask(image, mask):
     transformed_mask = transformed["mask"]
     return transformed_image, transformed_mask
 
+def process_nouns_format(nouns, caption):
+    if isinstance(caption, list):
+        caption = caption[0]
+    _nouns = []
+    for noun in nouns:
+        start = caption.index(noun)
+        end = start + len(noun)
+        word = noun
+        noun = dict(
+            word = noun,
+            start = start,
+            end = end
+        )
+        _nouns.append(noun)
+    return _nouns
+
+def process_nouns_in_caption(nouns, caption, tokenizer, image_token, image_token_id):
+    nouns = sorted(nouns, key=lambda x: x["end"], reverse=True)
+    for noun in nouns:
+        end = noun["end"]
+        caption = caption[:end] + image_token + caption[end:]
+
+    input_ids = tokenizer(
+        caption, 
+        truncation=True, 
+        max_length=77,
+        padding="max_length", 
+        return_tensors="pt"
+    ).input_ids[0]
+    noun_phrase_end_mask = [False for _ in input_ids]
+    clean_input_ids = []
+    track_idx = 0
+    for idx in input_ids:
+        if idx == image_token_id:
+            noun_phrase_end_mask[track_idx - 1] = True
+        else:
+            track_idx += 1
+            clean_input_ids.append(idx)
+            
+    max_len = tokenizer.model_max_length
+    if len(clean_input_ids) > max_len:
+        clean_input_ids = clean_input_ids[:max_len]
+    else:
+        clean_input_ids = clean_input_ids + [tokenizer.pad_token_id] * (
+            max_len - len(clean_input_ids)
+        )
+    noun_phrase_end_mask = torch.tensor(noun_phrase_end_mask, dtype=torch.bool)
+    assert noun_phrase_end_mask.sum() == 2
+    clean_input_ids = torch.tensor(clean_input_ids)
+    
+    image_token_ids = torch.nonzero(noun_phrase_end_mask[None], as_tuple=True)[1]
+    image_token_ids_mask = torch.ones_like(image_token_ids, dtype=torch.bool)
+    if len(image_token_ids) < 2:
+        image_token_ids = torch.cat(
+            [
+                image_token_ids,
+                torch.zeros(2 - len(image_token_ids), dtype=torch.long),
+            ]
+        )
+        image_token_ids_mask = torch.cat(
+            [
+                image_token_ids_mask,
+                torch.zeros(
+                    2 - len(image_token_ids_mask),
+                    dtype=torch.bool,
+                ),
+            ]
+        )
+    return dict(
+        caption=clean_input_ids,
+        image_token_masks=noun_phrase_end_mask,
+        image_token_ids=image_token_ids,
+        image_token_ids_mask=image_token_ids_mask,
+    )
 
 def process_single_ref_image(ref_image, ref_mask, tar_image, tar_mask):
     '''
@@ -326,7 +400,7 @@ def encode_inpainting(model: MultiDoor, control):
     return torch.cat([inpaint, mask], dim=1)
 
 
-def inference(ref_image, ref_mask, tar_image, tar_mask, caption, need_process, image_guidance=False, guidance_scale=5.0):
+def inference(ref_image, ref_mask, tar_image, tar_mask, ext, need_process, guidance_scale=5.0):
     '''
     inputs:
         ref_image.shape: (H, W, 3) or [(H1, W1, 3), (H2, W2, 3)]
@@ -364,31 +438,38 @@ def inference(ref_image, ref_mask, tar_image, tar_mask, caption, need_process, i
         hint = np.concatenate([collage / 127.5 - 1.0, collage_mask[:, :, :1]] , -1)
         item = None
 
+    input_ids: list = ext["caption"]
+    image_token_masks = ext["image_token_masks"].cuda()
+    
     num_samples = 1
     control = torch.from_numpy(hint.copy()).float().cuda() 
     control = torch.stack([control for _ in range(num_samples)], dim=0)
     control = einops.rearrange(control, 'b h w c -> b c h w').clone()
-    control = encode_inpainting(model, control)
+    control = encode_inpainting(model, control) # (b, 5, 64, 64)
 
     # dino_input.shape: (n, 224, 224, 3)
     dino_input = torch.from_numpy(ref).float().cuda() 
     dino_input = torch.stack([dino_input for _ in range(num_samples)], dim=0)
     dino_input = dino_input.clone()
-    img_token = model.image_encoder(dino_input)   # (b, n * 25, 1024)
+    image_token = model.image_encoder(dino_input)   # (b, n, 1, 1536)
+    clip_input = input_ids.unsqueeze(0)
+    text_token = model.get_learned_conditioning(clip_input.cuda()).last_hidden_state # (b, 77, 1024)
+    context = model.fuser(
+        text_token,
+        image_token,
+        image_token_masks,
+    )
 
     guess_mode = False
     H, W = 512, 512
     
-    clip_input = caption * num_samples
-    cond_text = model.get_learned_conditioning(clip_input) # (b, 77, 1024)
-    uncond = model.get_unconditional_conditioning(num_samples, image_guidance=image_guidance) # (b, 77, 1024) or (b, 514, 1024)
-    # caption_embedding: (b, 77, 1024)
+    uncond = model.get_unconditional_conditioning(num_samples) # (b, 77, 1024)
     
-    cond = {"c_concat": control, "c_crossattn": cond_text, "image_token": img_token}
+    cond = {"c_concat": control, "c_crossattn": context}
     if image_guidance:
-        un_cond = {"c_concat": None if guess_mode else control, "c_crossattn": cond_text, "image_token": uncond}
+        un_cond = {"c_concat": None if guess_mode else control, "c_crossattn": context}
     else:
-        un_cond = {"c_concat": None if guess_mode else control, "c_crossattn": uncond, "image_token": img_token}
+        un_cond = {"c_concat": None if guess_mode else control, "c_crossattn": uncond}
     shape = (4, H // 8, W // 8)
 
     if save_memory:
@@ -437,14 +518,35 @@ if __name__ == '__main__':
     # bg_mask_path = [bg_image_path.replace("00.png", "mask_1.png"), bg_image_path.replace("00.png", "mask_0.png")]
     reference_image_path = ['examples/cocoval/ref/39.jpg', 'examples/cocoval/ref/1125.jpg']
     reference_mask_path = [image_path.replace(".jpg", ".png") for 
-                                        image_path in reference_image_path]
+        image_path in reference_image_path]
     bg_id = 142
     bg_image_path = f'examples/cocoval/bg/{bg_id}/bg.jpg'
     bg_mask_path = [f'examples/cocoval/bg/{bg_id}/0.png', f'examples/cocoval/bg/{bg_id}/1.png']
-    caption = ['The person is sitting on the sofa']
+    caption = "The person is sitting on the yellow sofa"
+    nouns = ["person", "sofa"]
     start = 0
     need_process = False
     image_guidance = False
+    
+    pretrained_model_name_or_path = "/data00/sqy/checkpoints/stable-diffusion-2-1-base"
+    tokenizer = CLIPTokenizer.from_pretrained(
+        pretrained_model_name_or_path, 
+        subfolder="tokenizer",
+        revision=None,
+    )
+    image_token = "<|image|>"
+    tokenizer.add_tokens([image_token], special_tokens=True)
+    image_token_id = tokenizer.convert_tokens_to_ids(image_token)
+    
+    nouns = process_nouns_format(nouns, caption)
+    ext = process_nouns_in_caption(
+        nouns=nouns,
+        caption=caption,
+        tokenizer=tokenizer,
+        image_token=image_token,
+        image_token_id=image_token_id
+    )
+    
     while True:
         while True:
             save_path = os.path.join(os.path.dirname(bg_image_path), "GEN", f"{start}.png")
@@ -472,7 +574,7 @@ if __name__ == '__main__':
         tar_mask = [np.array(Image.open(file).convert('L')) == 255 for file in bg_mask_path]
         tar_mask = np.stack(tar_mask, axis=0).astype(np.uint8)
         
-        gen_image, hint = inference(ref_image, ref_mask, back_image, tar_mask, caption, need_process=need_process, image_guidance=image_guidance, guidance_scale=7.5)
+        gen_image, hint = inference(ref_image, ref_mask, back_image, tar_mask, ext, need_process=need_process, guidance_scale=7.5)
         
         h, w = back_image.shape[0], back_image.shape[1]
         hint = cv2.resize(hint, (w, h))
