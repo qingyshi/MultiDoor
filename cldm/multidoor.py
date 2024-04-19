@@ -60,9 +60,10 @@ class MultiDoorPostfuseModule(nn.Module):
         text_embeds,
         object_embeds,
         image_token_mask,
+        num_objects,
     ) -> torch.Tensor:
         text_object_embeds = fuse_object_embeddings(
-            text_embeds, image_token_mask, object_embeds, self.fuse_fn)
+            text_embeds, image_token_mask, object_embeds, num_objects, self.fuse_fn)
 
         return text_object_embeds
 
@@ -240,17 +241,18 @@ class MultiDoor(LatentDiffusion):
         c_concat = torch.cat([inpaint, mask], dim=1)
         image = batch[self.image_key] # image.shape: (b, n, 224, 224, 3)
         image_token = self.image_encoder(image) # image_token.shape: (b, n, 1, 1536)
-        num_objects = image_token.shape[1]
         
         image_token_masks = batch["image_token_masks"]
         image_token_ids = batch["image_token_ids"]
         image_token_ids_mask = batch["image_token_ids_mask"]
         target_masks = batch["target_masks"]   # (b, n, 512, 512)
+        num_objects = batch["num_objects"]  # (b,)
         
         context = self.fuser(
             text_token, # (b, 77, 1024)
             image_token,    # (b, n, 1, 1536)
             image_token_masks,  # (b, 77)
+            num_objects, # (b,)
         )
         
         cond = dict(
@@ -375,7 +377,3 @@ class MultiDoor(LatentDiffusion):
         uncond = torch.tensor([self.pad_token_id] * num_samples).unsqueeze(1).repeat(1, 77).to("cuda")
         uncond = self.cond_stage_model(uncond).last_hidden_state
         return uncond   # (b, 77, 1024)
-
-    @torch.no_grad()
-    def validation_step(self, batch, batch_idx):
-        pass

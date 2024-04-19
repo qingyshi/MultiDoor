@@ -16,7 +16,7 @@ class CocoValDataset(BaseDataset):
         self.transforms = transforms
         self.cat_to_names = {cat_id: cat['name'] for cat_id, cat in self.coco.cats.items()}
         self.dynamic = 0
-    
+
     def get_sample(self, index):
         coco = self.coco
         img_id = self.data[index]
@@ -42,7 +42,7 @@ class CocoValDataset(BaseDataset):
             masks.append(mask)
             names.append(self.cat_to_names[ann['category_id']])
 
-        caption = " and ".join(names)
+        caption = "_".join(names)
         item_with_collage = self.process_pairs(ref_image=img, ref_mask=masks, 
                                                tar_image=img.copy(), tar_mask=masks.copy())
         sampled_time_steps = self.sample_timestep()
@@ -50,8 +50,6 @@ class CocoValDataset(BaseDataset):
         item_with_collage['time_steps'] = sampled_time_steps
         item_with_collage['image_path'] = image_path
         item_with_collage['caption'] = caption
-        item_with_collage['ref_image'] = img
-        item_with_collage['masks'] = masks
         item_with_collage['chosen_objs'] = chosen_objs
         return item_with_collage
 

@@ -9,6 +9,7 @@ from .base import BaseDataset
 
 class YoutubeVOSDataset(BaseDataset):
     def __init__(self, image_dir, anno, meta, caption):
+        super().__init__()
         self.image_root = image_dir
         self.anno_root = anno
         self.meta_file = meta
@@ -28,7 +29,7 @@ class YoutubeVOSDataset(BaseDataset):
         self.dynamic = 1
 
     def __len__(self):
-        return 40000
+        return 20000
 
     def check_region_size(self, image, yyxx, ratio, mode = 'max'):
         pass_flag = True
@@ -46,19 +47,11 @@ class YoutubeVOSDataset(BaseDataset):
 
     def get_sample(self, idx):
         video_id = list(self.records.keys())[idx]
-        caption, chosen_objs, nouns, predicate = self.load_caption(video_id)
-        # objects = list(self.records[video_id]["objects"].keys())
-        # if len(objects) >= 2:
-        #     chosen_objs = np.random.choice(list(self.records[video_id]["objects"].keys()), 2, replace=False)
-        # else:
-        #     raise Exception
+        caption, chosen_objs, nouns = self.load_caption(video_id)
+        batch = self.process_nouns_in_caption(nouns, caption)
         
         frames = [self.records[video_id]["objects"][str(objects_id)]["frames"] for objects_id in chosen_objs]
-        names = [self.records[video_id]["objects"][str(objects_id)]["category"] for objects_id in chosen_objs]
         frames = np.intersect1d(*frames)
-
-        nouns = self.check_names_in_nouns(names, nouns, caption)
-        batch = self.process_nouns_in_caption(nouns, caption)
 
         # Sampling frames
         min_interval = len(frames) // 10
@@ -93,10 +86,6 @@ class YoutubeVOSDataset(BaseDataset):
         sampled_time_steps = self.sample_timestep()
         
         item_with_collage['time_steps'] = sampled_time_steps
-        # item_with_collage['chosen_objs'] = chosen_objs
-        # item_with_collage['names'] = names
-        # item_with_collage['image_path'] = tar_image_path
-        # item_with_collage['video_id'] = video_id
         item_with_collage.update(batch)
         return item_with_collage
 

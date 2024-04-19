@@ -11,33 +11,19 @@ from PIL import Image
 from .base import BaseDataset
 
 class VIPSegDataset(BaseDataset):
-    def __init__(self, image_dir, anno, meta, caption):
+    def __init__(self, image_dir, caption):
+        super().__init__()
         self.image_root = image_dir
-        self.anno_root = anno
         video_dirs = []
         video_dirs = os.listdir(self.image_root)
         self.data = video_dirs
         self.size = (512,512)
         self.clip_size = (224,224)
-        self.dynamic = 2
-        
-        with open(caption, 'r') as file:
-            self.caption = json.load(file)
-        with open(meta, 'r') as file:
-            ann = json.load(file)
-        
-        self.vid_id2frame_ann = {}
-        for video_ann in ann['annotations']:
-            self.vid_id2frame_ann[video_ann['video_id']] = video_ann['annotations']   # list: annotations per frame
-            
-        self.id2name = {}
-        self.id2is_thing = {}
-        for cat in ann['categories']:
-            self.id2name[cat['id']] = cat['name']
-            self.id2is_thing[cat['id']] = cat['isthing']
-
+        self.caption = json.load(open(caption, "r"))
+        self.dynamic = 1   
+    
     def __len__(self):
-        return 40000
+        return 10000
 
     def check_region_size(self, image, yyxx, ratio, mode = 'max'):
         pass_flag = True
@@ -53,46 +39,16 @@ class VIPSegDataset(BaseDataset):
                 pass_flag = False
         return pass_flag
 
-    def load_caption(self, id):
-        if id not in self.caption:
-            raise Exception
-        else:
-            anno = self.caption[id]
-            caption = anno.get('caption')
-            chosen_objs = anno.get('chosen_objs')
-            start_end_frames = anno.get('start_end_frames')
-            nouns = anno.get('nouns')
-            predicate = anno.get('predicate')
-        return caption, chosen_objs, start_end_frames, nouns, predicate
-
     def get_sample(self, idx):
         video_name = self.data[idx]  
-        caption, chosen_objs, start_end_frames, nouns, predicate = self.load_caption(video_name)
-        start_frame_index, end_frame_index = start_end_frames
-        
-        ann_per_frame = self.vid_id2frame_ann[video_name]     # list of every frames
-        end_frame_ann = ann_per_frame[end_frame_index]
-        
-        video_path = os.path.join(self.image_root, video_name)
-        frames = os.listdir(video_path)
-        chosen_cat_id = []
-        for single_obj in chosen_objs:
-            obj_ids = [obj['id'] for obj in end_frame_ann['segments_info']]
-            segment_info = end_frame_ann['segments_info'][obj_ids.index(single_obj)]
-            chosen_cat_id.append(segment_info['category_id'])
-              
-        names = [self.id2name[cat_id] for cat_id in chosen_cat_id]
-        nouns = self.check_names_in_nouns(names, nouns, caption)
+        caption, chosen_objs, start_end_frames, nouns = self.load_caption(video_name)
         batch = self.process_nouns_in_caption(nouns, caption)
 
-        # Sampling frames
-        # min_interval = len(frames) // 100
-        # start_frame_index = np.random.randint(low=0, high=len(frames) - min_interval)
-        # end_frame_index = start_frame_index + np.random.randint(min_interval, len(frames) - start_frame_index)
-        # end_frame_index = min(end_frame_index, len(frames) - 1)
-        # start_end_frames = [int(start_frame_index), int(end_frame_index)]
+        video_path = os.path.join(self.image_root, video_name)
+        frames = os.listdir(video_path)
         
         # Get image path
+        start_frame_index, end_frame_index = start_end_frames
         ref_image_name = frames[start_frame_index]
         tar_image_name = frames[end_frame_index]
         ref_image_path = os.path.join(self.image_root, video_name, ref_image_name)
@@ -114,31 +70,12 @@ class VIPSegDataset(BaseDataset):
         tar_mask = np.array(Image.open(tar_mask_path).convert('RGB'))
         tar_mask = rgb2id(tar_mask)
         
-        # ref_ids = np.unique(ref_mask)
-        # tar_ids = np.unique(tar_mask)
-
-        # common_ids = list(np.intersect1d(ref_ids, tar_ids))
-        # common_ids = [i for i in common_ids if i != 0]
-        
-        # if len(common_ids) >= 2:
-        #     chosen_objs = np.random.choice(common_ids, 2, replace=False)
-        # else:
-        #     raise Exception
-        
         ref_mask = [ref_mask == single_id for single_id in chosen_objs]
         tar_mask = [tar_mask == single_id for single_id in chosen_objs]
-        # len_mask = len(self.check_connect(ref_mask[0].astype(np.uint8)))
-        # assert len_mask == 1
-
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()
         
         item_with_collage['time_steps'] = sampled_time_steps
-        # item_with_collage['video_id'] = video_name
-        # item_with_collage['image_path'] = tar_image_path
-        # item_with_collage['names'] = names
-        # item_with_collage['chosen_objs'] = chosen_objs
-        # item_with_collage['start_end_frames'] = start_end_frames
         item_with_collage.update(batch)
         return item_with_collage
 
@@ -147,3 +84,16 @@ class VIPSegDataset(BaseDataset):
         cnt_area = [cv2.contourArea(cnt) for cnt in contours]
         return cnt_area
 
+    def load_caption(self, idx):
+        if idx not in self.caption:
+            raise Exception
+        else:
+            anno = self.caption[idx]
+            caption = anno['caption']
+            chosen_objs = anno['chosen_objs']
+            start_end_frames = anno['start_end_frames']
+            nouns = anno['nouns']
+            reverse_mask = anno['reverse_mask']
+            if reverse_mask:
+                chosen_objs = list(reversed(chosen_objs))
+        return caption, chosen_objs, start_end_frames, nouns

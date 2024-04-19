@@ -11,6 +11,7 @@ from .base import BaseDataset
 
 class YoutubeVISDataset(BaseDataset):
     def __init__(self, image_dir, anno, meta, caption):
+        super().__init__()
         self.image_root = image_dir
         self.anno_root = anno 
         self.meta_file = meta
@@ -22,16 +23,16 @@ class YoutubeVISDataset(BaseDataset):
             for video_id in records:
                 video_dirs.append(video_id)
         
-        with open(caption) as f:
+        with open(caption, 'r') as f:
             self.caption = json.load(f)
         self.records = records
         self.data = video_dirs
         self.size = (512,512)
         self.clip_size = (224,224)
-        self.dynamic = 1
+        self.dynamic = 2
 
     def __len__(self):
-        return 40000
+        return 20000
 
     def check_region_size(self, image, yyxx, ratio, mode = 'max'):
         pass_flag = True
@@ -49,20 +50,11 @@ class YoutubeVISDataset(BaseDataset):
     
     def get_sample(self, idx):
         video_id = list(self.records.keys())[idx]
-        caption, chosen_objs, nouns, predicate = self.load_caption(video_id)
-        
-        # obj_list = list(self.records[video_id]["objects"].keys())
-        # if len(obj_list) >= 2:
-        #     chosen_objs = np.random.choice(obj_list, 2, replace=False)
-        # else:
-        #     raise Exception
+        caption, chosen_objs, nouns = self.load_caption(video_id)
+        batch = self.process_nouns_in_caption(nouns, caption)
             
         frames = [self.records[video_id]["objects"][str(single_id)]["frames"] for single_id in chosen_objs]
-        names = [self.records[video_id]["objects"][str(single_id)]["category"] for single_id in chosen_objs]
         frames = np.intersect1d(*frames)
-        
-        nouns = self.check_names_in_nouns(names, nouns, caption)
-        batch = self.process_nouns_in_caption(nouns, caption)
 
         # Sampling frames
         min_interval = len(frames) // 10
@@ -97,16 +89,13 @@ class YoutubeVISDataset(BaseDataset):
         sampled_time_steps = self.sample_timestep()
         
         item_with_collage['time_steps'] = sampled_time_steps
-        # item_with_collage['chosen_objs'] = chosen_objs
-        # item_with_collage['names'] = names
-        # item_with_collage['image_path'] = tar_image_path
-        # item_with_collage['video_id'] = video_id
         item_with_collage.update(batch)
         return item_with_collage
 
 
 class YoutubeVIS21Dataset(BaseDataset):
     def __init__(self, root, anno, caption):
+        super().__init__()
         self.root = root
         with open(anno, 'r') as file:
             self.anno = json.load(file)
@@ -128,7 +117,7 @@ class YoutubeVIS21Dataset(BaseDataset):
         self.dynamic = 2
 
     def __len__(self):
-        return 40000
+        return 20000
 
     def frames(self, segments_info):
         frames = []
@@ -157,14 +146,9 @@ class YoutubeVIS21Dataset(BaseDataset):
         objects = video['objects']
         file_names = video['file_names']
         
-        caption, chosen_objs = self.load_caption(str(video_id))
-        # if len(objects) >= 2:
-        #     chosen_objs = np.random.choice(len(objects), 2, replace=False)
-        # else:
-        #     raise Exception
+        caption, chosen_objs, nouns = self.load_caption(str(video_id))
+        batch = self.process_nouns_in_caption(nouns, caption)
         objects = [objects[ids] for ids in chosen_objs]
-        
-        names = [self.id2cat[obj['category_id']] for obj in objects]
         frames = np.intersect1d(*[self.frames(obj['segmentations']) for obj in objects])
         
         # Sampling frames
@@ -198,9 +182,5 @@ class YoutubeVIS21Dataset(BaseDataset):
         sampled_time_steps = self.sample_timestep()
         
         item_with_collage['time_steps'] = sampled_time_steps
-        # item_with_collage['chosen_objs'] = chosen_objs
-        # item_with_collage['names'] = names
-        # item_with_collage['image_path'] = tar_image_path
-        # item_with_collage['video_id'] = video_id
-        item_with_collage['caption'] = caption
+        item_with_collage.update(batch)
         return item_with_collage

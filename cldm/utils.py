@@ -17,9 +17,10 @@ def add_unet_crossattn_map_store(unet, cross_attn_map_store):
 
 
 def fuse_object_embeddings(
-    inputs_embeds,
-    image_token_mask,
-    object_embeds,
+    inputs_embeds,  # (b, 77, 1024)
+    image_token_mask,   # (b, 77)
+    object_embeds,  # (b, max_num_objects, 1, 1536)
+    num_objects,    # (b, 1)
     fuse_fn=torch.add,
 ):
     object_embeds = object_embeds.to(inputs_embeds.dtype)
@@ -30,7 +31,8 @@ def fuse_object_embeddings(
         -1, object_embeds.shape[-2], object_embeds.shape[-1]
     )
 
-    valid_object_embeds = flat_object_embeds
+    valid_ids = torch.arange(max_num_objects, device=object_embeds.device)[None, :] < num_objects
+    valid_object_embeds = flat_object_embeds[valid_ids.flatten()]
 
     inputs_embeds = inputs_embeds.view(-1, inputs_embeds.shape[-1])
     image_token_mask = image_token_mask.view(-1)

@@ -7,23 +7,17 @@ from .base import BaseDataset
 
 
 class PVSGDataset(BaseDataset):
-    def __init__(self, data_root="/data00/OpenPVSG/data"):
+    def __init__(self, data_root):
         super().__init__()
         self.data_root = data_root
         with open(os.path.join(data_root, 'pvsg.json'), 'r') as f:
             anno = json.load(f)
         self.anno = anno
         self.data = anno['data']
-        '''
-         Dynamic:
-            0: Static View, High Quality
-            1: Multi-view, Low Quality
-            2: Multi-view, High Quality
-        '''
         self.dynamic = 2
 
     def __len__(self):
-        return 40000
+        return 20000
     
     def get_sample(self, index):
         data = self.data[index]
@@ -76,12 +70,11 @@ class PVSGDataset(BaseDataset):
         tar_mask = np.array(Image.open(tar_mask_path))
         tar_mask = [tar_mask == ids for ids in objects_ids]
         
-        item_with_collage = self.process_pairs(ref_image=ref_image, ref_mask=ref_mask, 
-                                    tar_image=tar_image, tar_mask=tar_mask)
+        item_with_collage = self.process_pairs(ref_image=ref_image, ref_masks=ref_mask, 
+                                               tar_image=tar_image, tar_masks=tar_mask)
         sampled_time_steps = self.sample_timestep()
         
         item_with_collage['time_steps'] = sampled_time_steps
-        # item_with_collage['image_path'] = tar_image_path
         item_with_collage.update(batch)
         return item_with_collage
         

@@ -15,8 +15,9 @@ import albumentations as A
 from omegaconf import OmegaConf
 from PIL import Image
 import os
+import shutil
 from transformers import CLIPTokenizer
-
+import math
 
 save_memory = False
 disable_verbosity()
@@ -52,7 +53,6 @@ def process_nouns_format(nouns, caption):
     for noun in nouns:
         start = caption.index(noun)
         end = start + len(noun)
-        word = noun
         noun = dict(
             word = noun,
             start = start,
@@ -414,11 +414,10 @@ def inference(ref_image, ref_mask, tar_image, tar_mask, ext, need_process, guida
         else:
             item = process_single_ref_image(ref_image, ref_mask, tar_image, tar_mask)
         ref = item['ref']
-        tar = item['jpg'] 
         hint = item['hint']
     else:
         multi_ref_image_collage = [sobel(masked_ref_image_compose, ref_mask_compose / 255) for 
-                            masked_ref_image_compose, ref_mask_compose in zip(ref_image, ref_mask)]
+            masked_ref_image_compose, ref_mask_compose in zip(ref_image, ref_mask)]
         multi_bbox = []
         for single_mask in tar_mask:
             tar_box_yyxx = get_bbox_from_mask(single_mask)
@@ -451,7 +450,7 @@ def inference(ref_image, ref_mask, tar_image, tar_mask, ext, need_process, guida
     dino_input = torch.from_numpy(ref).float().cuda() 
     dino_input = torch.stack([dino_input for _ in range(num_samples)], dim=0)
     dino_input = dino_input.clone()
-    image_token = model.image_encoder(dino_input)   # (b, n, 1, 1536)
+    image_token = model.image_encoder(dino_input) # (b, n, 1, 1536)
     clip_input = input_ids.unsqueeze(0)
     text_token = model.get_learned_conditioning(clip_input.cuda()).last_hidden_state # (b, 77, 1024)
     context = model.fuser(
@@ -466,30 +465,28 @@ def inference(ref_image, ref_mask, tar_image, tar_mask, ext, need_process, guida
     uncond = model.get_unconditional_conditioning(num_samples) # (b, 77, 1024)
     
     cond = {"c_concat": control, "c_crossattn": context}
-    if image_guidance:
-        un_cond = {"c_concat": None if guess_mode else control, "c_crossattn": context}
-    else:
-        un_cond = {"c_concat": None if guess_mode else control, "c_crossattn": uncond}
+    un_cond = {"c_concat": None if guess_mode else control, "c_crossattn": uncond}
     shape = (4, H // 8, W // 8)
 
     if save_memory:
         model.low_vram_shift(is_diffusing=True)
 
     # ====
-    num_samples = 1
-    image_resolution = 512
-    strength = 1
-    guess_mode = False
     ddim_steps = 50
     scale = guidance_scale
-    seed = -1 
     eta = 0.0
 
-    model.control_scales = [strength * (0.825 ** float(12 - i)) for i in range(13)] if guess_mode else ([strength] * 13)  # Magic number. IDK why. Perhaps because 0.825**12<0.01 but 0.826**12>0.01
-    samples, intermediates = ddim_sampler.sample(ddim_steps, num_samples,
-                                                 shape, cond, verbose=False, eta=eta,
-                                                 unconditional_guidance_scale=scale,
-                                                 unconditional_conditioning=un_cond)
+    samples, _ = ddim_sampler.sample(
+        ddim_steps, 
+        num_samples,
+        shape, 
+        cond, 
+        verbose=False,
+        eta=eta,
+        unconditional_guidance_scale=scale,
+        unconditional_conditioning=un_cond
+    )
+    
     if save_memory:
         model.low_vram_shift(is_diffusing=False)
 
@@ -512,22 +509,23 @@ def inference(ref_image, ref_mask, tar_image, tar_mask, ext, need_process, guida
 
 if __name__ == '__main__': 
     # ==== Example for inferring a single image ===
-    # reference_image_path = ['examples/dataset/dog/04.jpg', 'examples/dataset/dog2/04.jpg']
+    # reference_image_path = ['example/dreambooth/dog/04.jpg', 'examples/dreambooth/cat2/03.jpg']
     # reference_mask_path = [ref_image_path.replace('jpg', 'png') for ref_image_path in reference_image_path]
-    # bg_image_path = 'examples/background/11/00.png'
-    # bg_mask_path = [bg_image_path.replace("00.png", "mask_1.png"), bg_image_path.replace("00.png", "mask_0.png")]
-    reference_image_path = ['examples/cocoval/ref/39.jpg', 'examples/cocoval/ref/1125.jpg']
-    reference_mask_path = [image_path.replace(".jpg", ".png") for 
-        image_path in reference_image_path]
-    bg_id = 142
-    bg_image_path = f'examples/cocoval/bg/{bg_id}/bg.jpg'
-    bg_mask_path = [f'examples/cocoval/bg/{bg_id}/0.png', f'examples/cocoval/bg/{bg_id}/1.png']
-    caption = "The person is sitting on the yellow sofa"
-    nouns = ["person", "sofa"]
-    start = 0
+    # bg_image_path = 'examples/background/03/00.png'
+    # bg_mask_path = [bg_image_path.replace("00.png", "mask_0.png"), bg_image_path.replace("00.png", "mask_1.png")]
+    # need_process = True
+    reference_image_path = ['examples/cocovalv2/cat_dog/0/ref1.jpg', 'examples/cocovalv2/laptop_bench/0/ref2.jpg']
+    reference_bg_path = [os.path.join(os.path.dirname(image_path), "bg.jpg") for image_path in reference_image_path]
+    bg_id = 11
+    bg_image_path = f'examples/cocovalv2/person_surfboard/20/bg.jpg'
+    bg_mask_path = [bg_image_path.replace("bg.jpg", "0.png"), bg_image_path.replace("bg.jpg", "1.png")]
     need_process = False
-    image_guidance = False
     
+    caption = "The cat is surfing the surfboard."
+    nouns = ["cat", "surfboard"]
+    class_name = "_".join(nouns)
+    start = 1
+       
     pretrained_model_name_or_path = "/data00/sqy/checkpoints/stable-diffusion-2-1-base"
     tokenizer = CLIPTokenizer.from_pretrained(
         pretrained_model_name_or_path, 
@@ -547,24 +545,34 @@ if __name__ == '__main__':
         image_token_id=image_token_id
     )
     
+    start_index = 0
+    total_num = 5
+    save_root = "./examples/GEN"
     while True:
-        while True:
-            save_path = os.path.join(os.path.dirname(bg_image_path), "GEN", f"{start}.png")
-            if os.path.exists(save_path):
-                start += 1
-            else:
-                break
-        if not os.path.exists(os.path.dirname(save_path)):
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        save_dir = os.path.join(save_root, class_name, f"{start}")
+        if os.path.exists(save_dir):
+            start += 1
+        else:
+            break
+    while start_index < total_num:
+        save_path = os.path.join(save_dir, f"gen{start_index}.jpg")
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+            ref1_path = os.path.join(save_dir, "ref1.jpg")
+            ref2_path = os.path.join(save_dir, "ref2.jpg")
+            bg_path = os.path.join(save_dir, "bg.jpg")
+            shutil.copyfile(reference_bg_path[0], ref1_path)
+            shutil.copyfile(reference_bg_path[1], ref2_path)
+            shutil.copyfile(bg_image_path, bg_path)
 
         # reference image + reference mask
         if isinstance(reference_image_path, list):
-            image = [cv2.cvtColor(cv2.imread(ref_image_path), cv2.COLOR_BGR2RGB) for ref_image_path in reference_image_path]
+            image = [cv2.cvtColor(cv2.imread(ref_image_path), cv2.COLOR_BGR2RGB)
+                for ref_image_path in reference_image_path]
         else:
             image = cv2.cvtColor(cv2.imread(reference_image_path), cv2.COLOR_BGR2RGB)
-        mask = [np.array(Image.open(file).convert('L')) == 255 for file in reference_mask_path]
-        ref_image = image 
-        ref_mask = mask
+        ref_image = image
+        ref_mask = [(ref.sum(-1) != 255 * 3).astype(np.uint8) * 255 for ref in ref_image]
 
         # background image
         back_image = cv2.imread(bg_image_path).astype(np.uint8)
@@ -572,7 +580,6 @@ if __name__ == '__main__':
 
         # background mask 
         tar_mask = [np.array(Image.open(file).convert('L')) == 255 for file in bg_mask_path]
-        tar_mask = np.stack(tar_mask, axis=0).astype(np.uint8)
         
         gen_image, hint = inference(ref_image, ref_mask, back_image, tar_mask, ext, need_process=need_process, guidance_scale=7.5)
         
@@ -587,6 +594,21 @@ if __name__ == '__main__':
             ref_image = cv2.resize(ref_image, (w, h))
             tar_mask = [cv2.resize(tar_m, (w, h)) for tar_m in tar_mask]
             vis_image = cv2.hconcat([ref_image, back_image, hint, gen_image])
+          
+        start_index += 1
+        # cv2.imwrite(save_path, vis_image[:, :, ::-1])
+        cv2.imwrite(save_path, gen_image[:, :, ::-1])
         
-        cv2.imwrite(save_path, vis_image [:, :, ::-1])
-        print('finish!')
+        cross_attn_map = ddim_sampler.model.cross_attn_map_store['output_blocks.8.1.transformer_blocks.0.attn2']
+        cross_attn_map = cross_attn_map.mean((0, 1))
+        image_token_masks = ext["image_token_masks"]
+        cross_attn_map = cross_attn_map[:, image_token_masks]
+        res = int(math.sqrt(cross_attn_map.shape[0]))
+        cross_attn_map = cross_attn_map.reshape(res, res, -1)
+        ref1, ref2 = torch.chunk(cross_attn_map, 2, dim=-1)
+        ref1 = ref1.squeeze(-1).cpu().numpy()
+        ref2 = ref2.squeeze(-1).cpu().numpy()
+        ref1 = (ref1 - ref1.min()) / (ref1.max() - ref1.min())
+        ref2 = (ref2 - ref2.min()) / (ref2.max() - ref2.min())
+        cv2.imwrite("camap1.jpg", ref1 * 255)
+        cv2.imwrite("camap2.jpg", ref2 * 255)

@@ -29,6 +29,7 @@ class BaseDataset(Dataset):
         self.tokenizer.add_tokens([image_token], special_tokens=True)
         self.image_token_id = self.tokenizer.convert_tokens_to_ids(image_token)
         self.data = []
+        self.caption = {}
 
     def __len__(self):
         # We adjust the ratio of different dataset by setting the length.
@@ -55,7 +56,6 @@ class BaseDataset(Dataset):
         transformed_mask = transformed["mask"]
         return transformed_image, transformed_mask
 
-
     def check_region_size(self, image, yyxx, ratio, mode='max'):
         pass_flag = True
         H, W = image.shape[0], image.shape[1]
@@ -70,7 +70,6 @@ class BaseDataset(Dataset):
                 pass_flag = False
         return pass_flag
 
-
     def __getitem__(self, idx):
         while(True):
             try:
@@ -84,20 +83,9 @@ class BaseDataset(Dataset):
         # Implemented for each specific dataset
         pass
     
-    def load_caption(self, id):
-        if id not in self.caption:
-            raise Exception
-        else:
-            anno = self.caption[id]
-            caption = anno['caption']
-            chosen_objs = anno.get('chosen_objs', None)
-            nouns: list = anno.get('nouns', None)
-            predicate: str = anno.get('predicate', None)
-        return caption, chosen_objs, nouns, predicate
-    
-    def sample_timestep(self, max_step =1000):
+    def sample_timestep(self, max_step=1000):
         if np.random.rand() < 0.3:
-            step = np.random.randint(0,max_step)
+            step = np.random.randint(0, max_step)
             return np.array([step])
 
         if self.dynamic == 1:
@@ -122,32 +110,27 @@ class BaseDataset(Dataset):
             return False
         else:
             return True 
-    
 
-    def process_pairs(self, ref_image, ref_mask, tar_image, tar_mask, max_ratio=0.9):
-        assert max(mask_score(ref_mask[0]), mask_score(ref_mask[1])) > 0.90
-        assert self.check_mask_area(ref_mask[0]) == True
-        assert self.check_mask_area(tar_mask[0]) == True
-        assert self.check_mask_area(ref_mask[1]) == True
-        assert self.check_mask_area(tar_mask[1]) == True
+    def process_pairs(self, ref_image, ref_masks, tar_image, tar_masks, max_ratio=0.9):
+        assert max([mask_score(single_mask) for single_mask in ref_masks]) > 0.90
         '''
         inputs:
             ref_image: (H, W, 3)
-            ref_mask: [(H, W), (H, W)]
+            ref_masks: list of masks
             tar_image: (H, W, 3)
-            tar_mask: [(H, W), (H, W)]
+            tar_masks: list of masks
             
         outputs:
-            masked_ref_image_aug: (2, 224, 224, 3)
+            masked_ref_image_aug: (self.max_num_objects, 224, 224, 3)
             cropped_target_image: (512, 512, 3)
             collage: (512, 512, 4)
-            target_masks: (2, 512, 512)
+            target_masks: (self.max_num_objects, 512, 512)
         '''   
         # Get the outline Box of the reference image
         multi_subject_ref_image = []
         multi_subject_ref_mask = []
         
-        for single_mask in ref_mask:
+        for single_mask in ref_masks:
             ref_box_yyxx = get_bbox_from_mask(single_mask)
             assert self.check_region_size(single_mask, ref_box_yyxx, ratio=0.10, mode='min') == True
         
@@ -191,7 +174,7 @@ class BaseDataset(Dataset):
         multi_subject_bbox = []
         multi_subject_bbox_crop = []
         # tar_masks = []
-        for single_mask in tar_mask:
+        for single_mask in tar_masks:
             tar_box_yyxx = get_bbox_from_mask(single_mask)
             tar_box_yyxx = expand_bbox(single_mask, tar_box_yyxx, ratio=[1.1, 1.2]) # 1.1, 1.3
             multi_subject_bbox.append(tar_box_yyxx)
@@ -208,12 +191,14 @@ class BaseDataset(Dataset):
         y2 = max([bbox[1] for bbox in multi_subject_bbox_crop])
         x2 = max([bbox[3] for bbox in multi_subject_bbox_crop])
         tar_box_yyxx_crop = (y1, y2, x1, x2)
+        
         cropped_target_image = tar_image[y1: y2, x1: x2, :]
-        tar_masks = [mask[y1: y2, x1: x2] for mask in tar_mask]
         collage = cropped_target_image.copy()
         collage_mask = cropped_target_image.copy() * 0.0
-        tar_mask = np.max(tar_mask, axis=0)
-        cropped_tar_mask = tar_mask[y1: y2, x1: x2]
+        
+        tar_masks = [mask[y1: y2, x1: x2] for mask in tar_masks]
+        cropped_tar_mask = np.max(tar_masks, axis=0)
+        target_masks = tar_masks.copy()
         
         for single_bbox in multi_subject_bbox:
             tar_box_yyxx = box_in_box(single_bbox, tar_box_yyxx_crop)
@@ -242,16 +227,16 @@ class BaseDataset(Dataset):
         cropped_target_image = pad_to_square(cropped_target_image, pad_value = 0, random = False).astype(np.uint8)
         collage = pad_to_square(collage, pad_value = 0, random = False).astype(np.uint8)
         collage_mask = pad_to_square(collage_mask, pad_value = 2, random = False).astype(np.uint8)
-        tar_masks = [pad_to_square(single_mask[:, :, None], pad_value = 0, random = False).astype(np.uint8)[:, :, 0] 
-                        for single_mask in tar_masks]
+        target_masks = [pad_to_square(single_mask[:, :, None], pad_value = 0, random = False).astype(np.uint8)[:, :, 0] 
+            for single_mask in target_masks]
         H2, W2 = collage.shape[0], collage.shape[1]
 
         cropped_target_image = cv2.resize(cropped_target_image.astype(np.uint8), (512, 512)).astype(np.float32)
         collage = cv2.resize(collage.astype(np.uint8), (512, 512)).astype(np.float32)
         collage_mask = cv2.resize(collage_mask.astype(np.uint8), (512, 512), interpolation = cv2.INTER_NEAREST).astype(np.float32)
-        tar_masks = [cv2.resize(single_mask.astype(np.uint8), (512, 512), interpolation = cv2.INTER_NEAREST).astype(np.float32) 
-                        for single_mask in tar_masks]
-        tar_masks = np.stack(tar_masks, axis=0)
+        target_masks = [cv2.resize(single_mask.astype(np.uint8), (512, 512), interpolation = cv2.INTER_NEAREST).astype(np.float32) 
+            for single_mask in target_masks]
+        target_masks = np.stack(target_masks, axis=0)   # (n, 512, 512)
         collage_mask[collage_mask == 2] = -1
         
         # Prepairing dataloader items
@@ -260,15 +245,39 @@ class BaseDataset(Dataset):
         collage = collage / 127.5 - 1.0 
         collage = np.concatenate([collage, collage_mask[:, :, :1]], -1)
         
+        num_objects = np.array([masked_ref_image_aug.shape[0]])
+        if len(masked_ref_image_aug) < self.max_num_objects:
+            n, c, h, w = masked_ref_image_aug.shape
+            ref_padding = np.zeros(self.max_num_objects - n, c, h, w)
+            masked_ref_image_aug = np.concatenate([masked_ref_image_aug, ref_padding], axis=0)
+            
+            _, H, W = target_masks.shape
+            mask_padding = np.zeros(self.max_num_objects - n, H, W)
+            target_masks = np.concatenate([target_masks, mask_padding], axis=0)
+             
         item = dict(
-                ref=masked_ref_image_aug.copy(), 
-                jpg=cropped_target_image.copy(), 
-                hint=collage.copy(), 
-                extra_sizes=np.array([H1, W1, H2, W2]), 
-                tar_box_yyxx_crop=np.array(tar_box_yyxx_crop),
-                target_masks=tar_masks, # (n, 512, 512)
+            ref=masked_ref_image_aug.copy(), 
+            jpg=cropped_target_image.copy(), 
+            hint=collage.copy(), 
+            extra_sizes=np.array([H1, W1, H2, W2]), 
+            tar_box_yyxx_crop=np.array(tar_box_yyxx_crop),
+            target_masks=target_masks,
+            num_objects=num_objects,
         ) 
         return item
+
+    def load_caption(self, idx):
+        if idx not in self.caption:
+            raise Exception
+        else:
+            anno = self.caption[idx]
+            caption: str = anno['caption']
+            chosen_objs: list = anno['chosen_objs']
+            nouns: list = anno['nouns']
+            reverse_mask: bool = anno['reverse_mask']
+            if reverse_mask:
+                chosen_objs = list(reversed(chosen_objs))
+        return caption, chosen_objs, nouns
 
     def process_nouns_in_caption(self, nouns, caption):
         nouns = sorted(nouns, key=lambda x: x["end"], reverse=True)

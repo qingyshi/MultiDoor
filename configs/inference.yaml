@@ -1,3 +1,3 @@
-pretrained_model: lightning_logs/version_18/checkpoints/epoch=5-step=59999.ckpt
+pretrained_model: /data00/sqy/checkpoints/anydoor/v1/epoch=9-step=99999.ckpt
 config_file: configs/multidoor.yaml
 save_memory: False
