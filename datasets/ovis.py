@@ -11,8 +11,8 @@ from .base import BaseDataset
 class OVISDataset(BaseDataset):
     
     CLASSES=['Person', 'Bird', 'Cat', 'Dog', 'Horse', 'Sheep', 'Cow', 'Elephant', 'Bear', 'Zebra', 'Giraffe',
-                  'Poultry', 'Giant_panda', 'Lizard', 'Parrot', 'Monkey', 'Rabbit', 'Tiger', 'Fish', 'Turtle', 'Bicycle',
-               'Motorcycle', 'Airplane', 'Boat', 'Vehical']
+             'Poultry', 'Giant_panda', 'Lizard', 'Parrot', 'Monkey', 'Rabbit', 'Tiger', 'Fish', 'Turtle', 'Bicycle',
+             'Motorcycle', 'Airplane', 'Boat', 'Vehical']
 
     def __init__(
         self,
@@ -56,11 +56,6 @@ class OVISDataset(BaseDataset):
         
         vid_info = self.vid_infos[video_id]
         annnos = self.ovis.vidToAnns[video_id]  # list of dict
-        # num_objects = len(annnos)
-        # if num_objects >= 2:
-        #     chosen_objs = np.random.choice(num_objects, 2, replace=False).tolist()
-        # else:
-        #     raise Exception
         objects = [annnos[obj_id] for obj_id in chosen_objs]
         names = [self.ovis.cats[obj['category_id']]['name'].lower() for obj in objects]
         objects_masks = [obj["segmentations"] for obj in objects]

@@ -40,6 +40,7 @@ def fuse_object_embeddings(
 
     # slice out the image token embeddings
     image_token_embeds = inputs_embeds[image_token_mask]
+    assert image_token_embeds.shape[0] == valid_object_embeds.shape[0]
     valid_object_embeds = fuse_fn(image_token_embeds, valid_object_embeds)
 
     inputs_embeds.masked_scatter_(image_token_mask[:, None], valid_object_embeds)
@@ -77,7 +78,7 @@ def get_object_localization_loss_for_one_layer(
 
     # Resize the object segmentation maps to the size of the cross attention scores
     object_segmaps = F.interpolate(
-        object_segmaps, size=(size, size), mode="bilinear", antialias=True
+        object_segmaps, size=(size, size), mode="nearest"
     )  # (b, max_num_objects, size, size)
 
     object_segmaps = object_segmaps.view(

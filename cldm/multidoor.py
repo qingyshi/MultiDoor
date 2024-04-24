@@ -242,17 +242,17 @@ class MultiDoor(LatentDiffusion):
         image = batch[self.image_key] # image.shape: (b, n, 224, 224, 3)
         image_token = self.image_encoder(image) # image_token.shape: (b, n, 1, 1536)
         
-        image_token_masks = batch["image_token_masks"]
-        image_token_ids = batch["image_token_ids"]
-        image_token_ids_mask = batch["image_token_ids_mask"]
+        image_token_masks = batch["image_token_masks"]  # (b, 77)
+        image_token_ids = batch["image_token_ids"]  # (b, max_num_objects)
+        image_token_ids_mask = batch["image_token_ids_mask"]    # (b, max_num_objects)
         target_masks = batch["target_masks"]   # (b, n, 512, 512)
-        num_objects = batch["num_objects"]  # (b,)
+        num_objects = batch["num_objects"]  # (b, 1)
         
         context = self.fuser(
             text_token, # (b, 77, 1024)
             image_token,    # (b, n, 1, 1536)
             image_token_masks,  # (b, 77)
-            num_objects, # (b,)
+            num_objects, # (b, 1)
         )
         
         cond = dict(
@@ -297,6 +297,7 @@ class MultiDoor(LatentDiffusion):
         params = list(self.image_encoder.model.blocks[-2:].parameters())
         params += list(self.model.diffusion_model.parameters())
         params += list(self.fuser.parameters())
+        params.append(self.image_encoder.objects_token)
         opt = torch.optim.AdamW(params, lr=lr)
         return opt
     

@@ -292,7 +292,8 @@ class FrozenMultiDoorEncoder(AbstractEncoder):
         if freeze:
             self.freeze()
         self.image_mean = torch.tensor([0.485, 0.456, 0.406]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
-        self.image_std =  torch.tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)    
+        self.image_std =  torch.tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
+        self.objects_token = nn.Parameter(torch.randn((2, 1536)), requires_grad=True)
 
     def freeze(self):
         self.model.patch_embed.eval()
@@ -307,7 +308,7 @@ class FrozenMultiDoorEncoder(AbstractEncoder):
         Input:
             image: multiple reference objects from single image in shape (b, n, h, w, c)
         Output:
-            ref_token: reference tokens in shape (b, n, 1, 1536)
+            image_features: reference tokens in shape (b, n, 1, 1536)
         """
         
         if len(image.shape) == 5:
@@ -318,15 +319,9 @@ class FrozenMultiDoorEncoder(AbstractEncoder):
         features = self.model.forward_features(image)
         clstoken  = features["x_norm_clstoken"]
         clstoken = clstoken.reshape(b, n, 1, -1)
+        clstoken = clstoken + self.objects_token.data.reshape(1, n, 1, -1)
         image_features = clstoken
         return image_features
 
     def encode(self, image):
         return self(image)
-
-
-
-
-
-
-

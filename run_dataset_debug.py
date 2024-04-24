@@ -12,10 +12,10 @@ from datasets.ovis import OVISDataset
 from datasets.lvvis import LVVISDataset
 from torch.utils.data import ConcatDataset
 from torch.utils.data import DataLoader
-import numpy as np 
+import numpy as np
+import time
 import cv2
 import torch
-import json
 import os
 from tqdm import tqdm
 from omegaconf import OmegaConf
@@ -34,12 +34,14 @@ dataset9 = PVSGDataset(**DConf.Train.PVSG)
 dataset10 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
 dataset11 = YoutubeVISDataset(**DConf.Train.YoutubeVIS)
 dataset12 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)
+tokenizer = dataset1.tokenizer
 image_data = [dataset1, dataset2, dataset3]
-video_data = [dataset4, dataset5, dataset6, dataset7, dataset8, dataset9, dataset10, dataset11, dataset12]
+video_data = [dataset9, dataset10, dataset11, dataset12]
 
 # The ratio of each dataset is adjusted by setting the __len__ 
 dataset = ConcatDataset(image_data + video_data)
-dataloader = DataLoader(dataset, num_workers=8, batch_size=1, shuffle=True)
+dataset = dataset1
+dataloader = DataLoader(dataset, num_workers=0, batch_size=1, shuffle=True)
 
 def find_save_path(is_mask):
     image_dir = "examples/cocoval/ref"
@@ -109,7 +111,8 @@ def vis_sample(item):
     ref = ref.transpose(1, 2).flatten(2, 3) * 255
     tar = item['jpg'] * 127.5 + 127.5
     hint = item['hint'] * 127.5 + 127.5
-    step = item['time_steps']
+    target_masks = item['target_masks'][0][..., None].repeat(1, 1, 1, 3) * 255
+    target_masks = target_masks.transpose(0, 1).flatten(1, 2).numpy()
 
     ref = ref[0].numpy()
     tar = tar[0].numpy()
@@ -117,10 +120,14 @@ def vis_sample(item):
     hint_mask = hint[0, :, :, -1].numpy()
     hint_mask = np.stack([hint_mask, hint_mask, hint_mask], -1)
     ref = cv2.resize(ref.astype(np.uint8), (1024, 512))
-    vis = cv2.hconcat([ref.astype(np.float32), hint_image.astype(np.float32), hint_mask.astype(np.float32), tar.astype(np.float32)])
+    vis = cv2.hconcat([ref.astype(np.float32), hint_image.astype(np.float32), target_masks.astype(np.float32), tar.astype(np.float32)])
     cv2.imwrite('sample_vis.jpg', vis[:, :, ::-1])
-    # print(item['names'])
+    input_ids = item["caption"][0]
+    decode_string = tokenizer.decode(input_ids)
+    print(decode_string)
+    print(item['names'])
 
+count = 0
+start = time.time()
 for data in tqdm(dataloader):
-    pass
-    # vis_sample(data)
+    break

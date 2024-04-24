@@ -7,7 +7,13 @@ from .base import BaseDataset
 
 
 class VGDataset(BaseDataset):
-    def __init__(self, data_root="/data00/VisualGenome/", image_dir="VG_100K", mask_dir="relationships", anno_file="relationships.json"):
+    def __init__(
+        self, 
+        data_root="/data00/VisualGenome/", 
+        image_dir="VG_100K", 
+        mask_dir="relationships", 
+        anno_file="relationships.json"
+    ):
         self.data_root = data_root
         self.image_dir = os.path.join(data_root, image_dir)
         self.mask_dir = os.path.join(data_root, mask_dir)
@@ -45,11 +51,9 @@ class VGDataset(BaseDataset):
         obj_mask = cv2.imread(obj_mask_path, cv2.IMREAD_GRAYSCALE) == 255
         mask = [sub_mask.astype(np.uint8), obj_mask.astype(np.uint8)]
         
-        item_with_collage = self.process_pairs(ref_image=image, ref_mask=mask,
-                                               tar_image=image.copy, tar_mask=deepcopy(mask), max_ratio=1.)
+        item_with_collage = self.process_pairs(ref_image=image, ref_masks=mask,
+                                               tar_image=image, tar_masks=mask)
         sampled_time_steps = self.sample_timestep()
         
         item_with_collage['time_steps'] = sampled_time_steps
-        item_with_collage['img_path'] = image_path
-        item_with_collage['caption'] = caption
         return item_with_collage

@@ -25,18 +25,11 @@ class BurstDataset(BaseDataset):
         # num_frames = burst_video.num_annotated_frames
         _track_category_ids = burst_video._track_category_ids
         # frame_indices = np.random.choice(num_frames, 2, replace=False).tolist()
-        
+
         images = burst_video.load_images(frame_indices)
         images_path = burst_video.get_image_paths(frame_indices)
         masks: List[Dict] = burst_video.load_masks(frame_indices)
-        
-        # track_id = [list(mask.keys()) for mask in masks]
-        # common_objs = np.intersect1d(*track_id)
-        # if len(common_objs) >= 2:
-        #     chosen_objs = np.random.choice(common_objs, 2, replace=False).tolist()
-        # else:
-        #     raise Exception
-        
+    
         names = [self.id2name[_track_category_ids[obj]] for obj in chosen_objs]
         ref_mask = [masks[0][obj] for obj in chosen_objs]
         tar_mask = [masks[1][obj] for obj in chosen_objs]
@@ -52,7 +45,7 @@ class BurstDataset(BaseDataset):
         return item_with_collage
 
     def __len__(self):
-        return 10000
+        return 20000
     
     def load_caption(self, idx):
         if idx not in self.caption:

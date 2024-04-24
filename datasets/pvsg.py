@@ -37,7 +37,10 @@ class PVSGDataset(BaseDataset):
         names = object_classes
         nouns = []
         for name in names:
-            start = caption.index(name)
+            if len(nouns) > 0:
+                start = caption.index(name, nouns[0]["end"])
+            else:
+                start = caption.index(name)
             end = start + len(name)
             noun = dict(word=name, start=start, end=end)
             nouns.append(noun)

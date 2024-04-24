@@ -46,12 +46,12 @@ class LVVISDataset(BaseDataset):
     def get_sample(self, idx):
         video_id = self.data[idx]
         caption, chosen_objs, start_end_frames, nouns = self.load_caption(str(video_id))
+        if nouns[0]["end"] == nouns[1]["end"]:
+            raise Exception
         batch = self.process_nouns_in_caption(nouns, caption)
         
         vid_info = self.vid_infos[video_id]
         frames = vid_info["filenames"]
-        # num_frames = len(frames)
-        # start_end_frames = np.random.choice(num_frames, 2, replace=False).tolist()
         start_frame_idx = start_end_frames[0]
         end_frame_idx = start_end_frames[1]
         start_frame = frames[start_frame_idx]
@@ -59,18 +59,7 @@ class LVVISDataset(BaseDataset):
         
         annos = self.ovis.vidToAnns[video_id]  # list of dict            
         annos = sorted(annos, key=lambda x: mask_utils.decode(x["segmentations"][end_frame_idx]).sum(), reverse=True)
-        # chosen_objs = [0]
-        # biggest_mask = mask_utils.decode(annos[0]["segmentations"][end_frame_idx])
-        # for i in range(1, len(annos)):
-        #     mask = mask_utils.decode(annos[i]["segmentations"][end_frame_idx])
-        #     if (mask == biggest_mask).sum == mask.shape[0] * mask.shape[1]:
-        #         continue
-        #     if self.check_intersection(biggest_mask, mask):
-        #         chosen_objs.append(i)
-        #     if len(chosen_objs) == 2:
-        #         break
                 
-        assert len(chosen_objs) == 2
         objects = [annos[obj_id] for obj_id in chosen_objs]
         names = [self.ovis.cats[obj['category_id']]['name'].lower() for obj in objects]
         objects_masks = [obj["segmentations"] for obj in objects]
@@ -83,7 +72,6 @@ class LVVISDataset(BaseDataset):
         tar_image = cv2.cvtColor(tar_image, cv2.COLOR_BGR2RGB)
         
         ref_mask = [mask_utils.decode(object_masks[start_frame_idx]) for object_masks in objects_masks]
-        # already decode
         tar_mask = [mask_utils.decode(object_masks[end_frame_idx]) for object_masks in objects_masks]
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()

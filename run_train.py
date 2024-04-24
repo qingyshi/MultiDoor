@@ -27,7 +27,7 @@ logger_freq = 2000
 learning_rate = 1e-5
 sd_locked = False
 only_mid_control = False
-n_gpus = 6
+n_gpus = 4
 accumulate_grad_batches = 2
 max_epochs = 12
 
@@ -52,7 +52,7 @@ dataset9 = PVSGDataset(**DConf.Train.PVSG)
 dataset10 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
 dataset11 = YoutubeVISDataset(**DConf.Train.YoutubeVIS)
 dataset12 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)
-# dataset13 = VIPSegDataset(**DConf.Train.VIPSeg)
+dataset13 = VIPSegDataset(**DConf.Train.VIPSeg)
 
 image_data = [dataset1, dataset2, dataset3]
 video_data = [dataset4, dataset5, dataset6, dataset7, dataset8, dataset9, dataset10, dataset11, dataset12]
@@ -60,7 +60,7 @@ video_data = [dataset4, dataset5, dataset6, dataset7, dataset8, dataset9, datase
 # The ratio of each dataset is adjusted by setting the __len__ 
 dataset = ConcatDataset(image_data + video_data)
 dataloader = DataLoader(dataset, num_workers=8, batch_size=batch_size, shuffle=True)
-logger = ImageLogger(batch_frequency=logger_freq, split="composer")
+logger = ImageLogger(batch_frequency=logger_freq, split="train")
 trainer = pl.Trainer(
     gpus=n_gpus,
     strategy="ddp",

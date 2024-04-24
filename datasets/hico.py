@@ -4,6 +4,7 @@ import cv2
 import json
 import os
 from copy import deepcopy
+import time
 
 
 class HICODataset(BaseDataset):
@@ -45,7 +46,10 @@ class HICODataset(BaseDataset):
         names = ["person", obj]
         nouns = []
         for name in names:
-            start = caption.index(name)
+            if len(nouns) > 0:
+                start = caption.index(name, nouns[0]["end"])
+            else:
+                start = caption.index(name)
             end = start + len(name)
             noun = dict(word=name, start=start, end=end)
             nouns.append(noun)
@@ -68,7 +72,6 @@ class HICODataset(BaseDataset):
         sampled_time_steps = self.sample_timestep()
         
         item_with_collage['time_steps'] = sampled_time_steps
-        # item_with_collage['image_path'] = image_path
         item_with_collage.update(batch)
         return item_with_collage
     
@@ -112,7 +115,10 @@ class HICOTestDataset(BaseDataset):
         names = ["person", obj]
         nouns = []
         for name in names:
-            start = caption.index(name)
+            if len(nouns) > 0:
+                start = caption.index(name, nouns[0]["end"])
+            else:
+                start = caption.index(name)
             end = start + len(name)
             noun = dict(word=name, start=start, end=end)
             nouns.append(noun)

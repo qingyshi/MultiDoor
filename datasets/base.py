@@ -63,10 +63,10 @@ class BaseDataset(Dataset):
         y1, y2, x1, x2 = yyxx
         h, w = y2 - y1, x2 - x1
         if mode == 'max':
-            if h > H or w > W:
+            if h > H and w > W:
                 pass_flag = False
         elif mode == 'min':
-            if h < H or w < W:
+            if h < H and w < W:
                 pass_flag = False
         return pass_flag
 
@@ -162,12 +162,10 @@ class BaseDataset(Dataset):
             multi_subject_ref_mask.append(ref_mask_compose)
 
         masked_ref_image_compose = np.stack(multi_subject_ref_image, axis=0)
-        masked_ref_image_aug = masked_ref_image_compose.copy() # as ref image, shape: (2, 224, 244, 3)
+        masked_ref_image_aug = masked_ref_image_compose.copy() # as ref image, shape: (n, 224, 244, 3)
         # Getting for high-freqency map
         multi_ref_image_collage = [sobel(masked_ref_image_compose, ref_mask_compose / 255) 
-                                        for masked_ref_image_compose, ref_mask_compose in 
-                                        zip(multi_subject_ref_image, multi_subject_ref_mask)]
-
+            for masked_ref_image_compose, ref_mask_compose in zip(multi_subject_ref_image, multi_subject_ref_mask)]
 
 
         # ========= Training Target ===========
@@ -248,11 +246,11 @@ class BaseDataset(Dataset):
         num_objects = np.array([masked_ref_image_aug.shape[0]])
         if len(masked_ref_image_aug) < self.max_num_objects:
             n, c, h, w = masked_ref_image_aug.shape
-            ref_padding = np.zeros(self.max_num_objects - n, c, h, w)
+            ref_padding = np.zeros((self.max_num_objects - n, c, h, w))
             masked_ref_image_aug = np.concatenate([masked_ref_image_aug, ref_padding], axis=0)
             
             _, H, W = target_masks.shape
-            mask_padding = np.zeros(self.max_num_objects - n, H, W)
+            mask_padding = np.zeros((self.max_num_objects - n, H, W))
             target_masks = np.concatenate([target_masks, mask_padding], axis=0)
              
         item = dict(
@@ -310,7 +308,6 @@ class BaseDataset(Dataset):
                 max_len - len(clean_input_ids)
             )
         noun_phrase_end_mask = torch.tensor(noun_phrase_end_mask, dtype=torch.bool)
-        assert noun_phrase_end_mask.sum() == self.max_num_objects
         clean_input_ids = torch.tensor(clean_input_ids)
         
         image_token_ids = torch.nonzero(noun_phrase_end_mask[None], as_tuple=True)[1]
@@ -319,7 +316,8 @@ class BaseDataset(Dataset):
             image_token_ids = torch.cat(
                 [
                     image_token_ids,
-                    torch.zeros(self.max_num_objects - len(image_token_ids), dtype=torch.long),
+                    torch.zeros(self.max_num_objects - len(image_token_ids), 
+                                dtype=torch.long),
                 ]
             )
             image_token_ids_mask = torch.cat(
