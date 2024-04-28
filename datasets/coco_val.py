@@ -10,12 +10,22 @@ from .base import BaseDataset
 
 class CocoValDataset(BaseDataset):
     def __init__(self, root, annotation, transforms=None):
+        super().__init__()
         self.root = root
         self.coco = COCO(annotation)
         self.data = list(sorted(self.coco.imgs.keys()))
         self.transforms = transforms
         self.cat_to_names = {cat_id: cat['name'] for cat_id, cat in self.coco.cats.items()}
         self.dynamic = 0
+
+    def __getitem__(self, idx):
+        while(True):
+            try:
+                # idx = np.random.randint(0, len(self.data)-1)
+                item = self.get_sample(idx)
+                return item
+            except:
+                idx = np.random.randint(0, len(self.data)-1)
 
     def get_sample(self, index):
         coco = self.coco
@@ -43,8 +53,8 @@ class CocoValDataset(BaseDataset):
             names.append(self.cat_to_names[ann['category_id']])
 
         caption = "_".join(names)
-        item_with_collage = self.process_pairs(ref_image=img, ref_mask=masks, 
-                                               tar_image=img.copy(), tar_mask=masks.copy())
+        item_with_collage = self.process_pairs(ref_image=img, ref_masks=masks, 
+                                               tar_image=img.copy(), tar_masks=masks.copy())
         sampled_time_steps = self.sample_timestep()
         
         item_with_collage['time_steps'] = sampled_time_steps

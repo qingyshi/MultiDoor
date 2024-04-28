@@ -22,25 +22,25 @@ from omegaconf import OmegaConf
 
 # Datasets
 DConf = OmegaConf.load('./configs/datasets.yaml')
-dataset1 = HICODataset(**DConf.Train.HICO.Train)
-dataset2 = HICOTestDataset(**DConf.Train.HICO.Test)
-dataset3 = PSGDataset(**DConf.Train.PSG)
-dataset4 = BurstDataset(**DConf.Train.Burst.Train)
-dataset5 = BurstDataset(**DConf.Train.Burst.Val)
-dataset6 = BurstDataset(**DConf.Train.Burst.Test)
-dataset7 = LVVISDataset(**DConf.Train.LVVIS)
-dataset8 = OVISDataset(**DConf.Train.OVIS)
-dataset9 = PVSGDataset(**DConf.Train.PVSG)
-dataset10 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
-dataset11 = YoutubeVISDataset(**DConf.Train.YoutubeVIS)
-dataset12 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)
-tokenizer = dataset1.tokenizer
-image_data = [dataset1, dataset2, dataset3]
-video_data = [dataset9, dataset10, dataset11, dataset12]
+dataset = CocoValDataset(**DConf.Train.COCOVal)
+# dataset1 = HICODataset(**DConf.Train.HICO.Train)
+# dataset2 = HICOTestDataset(**DConf.Train.HICO.Test)
+# dataset3 = PSGDataset(**DConf.Train.PSG)
+# dataset4 = BurstDataset(**DConf.Train.Burst.Train)
+# dataset5 = BurstDataset(**DConf.Train.Burst.Val)
+# dataset6 = BurstDataset(**DConf.Train.Burst.Test)
+# dataset7 = LVVISDataset(**DConf.Train.LVVIS)
+# dataset8 = OVISDataset(**DConf.Train.OVIS)
+# dataset9 = PVSGDataset(**DConf.Train.PVSG)
+# dataset10 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
+# dataset11 = YoutubeVISDataset(**DConf.Train.YoutubeVIS)
+# dataset12 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)
+# tokenizer = dataset1.tokenizer
+# image_data = [dataset1, dataset2, dataset3]
+# video_data = [dataset9, dataset10, dataset11, dataset12]
 
-# The ratio of each dataset is adjusted by setting the __len__ 
+# # The ratio of each dataset is adjusted by setting the __len__ 
 # dataset = ConcatDataset(image_data + video_data)
-dataset = dataset4
 dataloader = DataLoader(dataset, num_workers=8, batch_size=1, shuffle=True)
 
 def find_save_path(is_mask):
@@ -79,7 +79,7 @@ def make_test_case(item):
     
     tar = tar.numpy()[:, :, ::-1]
     tar_mask1, tar_mask2 = tar_masks[0].numpy(), tar_masks[1].numpy()
-    bg = f"examples/cocovalv2/{caption}"
+    bg = f"examples/cocoval/{caption}"
     count = 0
     while True:
         dir_path = os.path.join(bg, str(count))
@@ -128,4 +128,4 @@ def vis_sample(item):
 
 
 for data in tqdm(dataloader):
-    vis_sample(data)
+    make_test_case(data)
