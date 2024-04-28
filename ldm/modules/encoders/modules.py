@@ -317,8 +317,10 @@ class FrozenMultiDoorEncoder(AbstractEncoder):
 
         image = (image.to(self.device)  - self.image_mean.to(self.device)) / self.image_std.to(self.device)
         features = self.model.forward_features(image)
-        clstoken  = features["x_norm_clstoken"]
-        clstoken = clstoken.reshape(b, n, 1, -1)
+        clstoken  = features["x_norm_clstoken"] # (b * n, 1536)
+        patchtokens = features["x_norm_patchtokens"] # (b * n, 256, 1536)
+        tokens = patchtokens.mean(1) + clstoken
+        clstoken = tokens.reshape(b, n, 1, -1)
         clstoken = clstoken + self.objects_token.data.reshape(1, n, 1, -1)
         image_features = clstoken
         return image_features
