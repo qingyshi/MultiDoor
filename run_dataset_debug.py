@@ -39,9 +39,9 @@ image_data = [dataset1, dataset2, dataset3]
 video_data = [dataset9, dataset10, dataset11, dataset12]
 
 # The ratio of each dataset is adjusted by setting the __len__ 
-dataset = ConcatDataset(image_data + video_data)
-dataset = dataset1
-dataloader = DataLoader(dataset, num_workers=0, batch_size=1, shuffle=True)
+# dataset = ConcatDataset(image_data + video_data)
+dataset = dataset4
+dataloader = DataLoader(dataset, num_workers=8, batch_size=1, shuffle=True)
 
 def find_save_path(is_mask):
     image_dir = "examples/cocoval/ref"
@@ -125,9 +125,7 @@ def vis_sample(item):
     input_ids = item["caption"][0]
     decode_string = tokenizer.decode(input_ids)
     print(decode_string)
-    print(item['names'])
 
-count = 0
-start = time.time()
+
 for data in tqdm(dataloader):
-    break
+    vis_sample(data)
