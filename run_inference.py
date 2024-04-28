@@ -329,6 +329,10 @@ def inference(ref_image, ref_mask, tar_image, tar_mask, ext, need_process, guida
     image_token_masks = ext["image_token_masks"].cuda()
     
     num_samples = 1
+    guess_mode = False
+    H, W = 512, 512
+    shape = (4, H // 8, W // 8)
+    
     control = torch.from_numpy(hint.copy()).float().cuda() 
     control = torch.stack([control for _ in range(num_samples)], dim=0)
     control = einops.rearrange(control, 'b h w c -> b c h w').clone()
@@ -341,24 +345,22 @@ def inference(ref_image, ref_mask, tar_image, tar_mask, ext, need_process, guida
     image_token = model.image_encoder(dino_input) # (b, n, 1, 1536)
     clip_input = input_ids.unsqueeze(0)
     text_token = model.get_learned_conditioning(clip_input.cuda()).last_hidden_state # (b, 77, 1024)
+    num_objects = torch.tensor([[2]]).cuda()
     context = model.fuser(
         text_token,
         image_token,
         image_token_masks,
+        num_objects,
     )
     uncond = model.get_unconditional_conditioning(num_samples) # (b, 77, 1024)
     cond = {"c_concat": control, "c_crossattn": context}
     un_cond = {"c_concat": None if guess_mode else control, "c_crossattn": uncond}
-    
-    guess_mode = False
-    H, W = 512, 512
-    shape = (4, H // 8, W // 8)
 
     if save_memory:
         model.low_vram_shift(is_diffusing=True)
 
     # ====
-    ddim_steps = 50
+    ddim_steps = 100
     scale = guidance_scale
     eta = 0.0
 
@@ -400,15 +402,15 @@ if __name__ == '__main__':
     # bg_image_path = 'examples/background/03/00.png'
     # bg_mask_path = [bg_image_path.replace("00.png", "mask_0.png"), bg_image_path.replace("00.png", "mask_1.png")]
     # need_process = True
-    reference_image_path = ['examples/cocovalv2/cat_dog/0/ref1.jpg', 'examples/cocovalv2/laptop_bench/0/ref2.jpg']
+    reference_image_path = ['examples/cocovalv2/dog_dog/22/ref1.jpg', 'examples/cocovalv2/bench_cat/1/ref2.jpg']
     reference_bg_path = [os.path.join(os.path.dirname(image_path), "bg.jpg") for image_path in reference_image_path]
     bg_id = 11
-    bg_image_path = f'examples/cocovalv2/person_surfboard/20/bg.jpg'
+    bg_image_path = f'examples/cocovalv2/dog_dog/3/bg.jpg'
     bg_mask_path = [bg_image_path.replace("bg.jpg", "0.png"), bg_image_path.replace("bg.jpg", "1.png")]
     need_process = False
     
-    caption = "The cat is surfing the surfboard."
-    nouns = ["cat", "surfboard"]
+    caption = "The dog is fighting with the cat."
+    nouns = ["dog", "cat"]
     class_name = "_".join(nouns)
     start = 1
        
@@ -485,16 +487,16 @@ if __name__ == '__main__':
         # cv2.imwrite(save_path, vis_image[:, :, ::-1])
         cv2.imwrite(save_path, gen_image[:, :, ::-1])
         
-        cross_attn_map = ddim_sampler.model.cross_attn_map_store['output_blocks.8.1.transformer_blocks.0.attn2']
-        cross_attn_map = cross_attn_map.mean((0, 1))
-        image_token_masks = ext["image_token_masks"]
-        cross_attn_map = cross_attn_map[:, image_token_masks]
-        res = int(math.sqrt(cross_attn_map.shape[0]))
-        cross_attn_map = cross_attn_map.reshape(res, res, -1)
-        ref1, ref2 = torch.chunk(cross_attn_map, 2, dim=-1)
-        ref1 = ref1.squeeze(-1).cpu().numpy()
-        ref2 = ref2.squeeze(-1).cpu().numpy()
-        ref1 = (ref1 - ref1.min()) / (ref1.max() - ref1.min())
-        ref2 = (ref2 - ref2.min()) / (ref2.max() - ref2.min())
-        cv2.imwrite("camap1.jpg", ref1 * 255)
-        cv2.imwrite("camap2.jpg", ref2 * 255)
+        # cross_attn_map = ddim_sampler.model.cross_attn_map_store['output_blocks.8.1.transformer_blocks.0.attn2']
+        # cross_attn_map = cross_attn_map.mean((0, 1))
+        # image_token_masks = ext["image_token_masks"]
+        # cross_attn_map = cross_attn_map[:, image_token_masks]
+        # res = int(math.sqrt(cross_attn_map.shape[0]))
+        # cross_attn_map = cross_attn_map.reshape(res, res, -1)
+        # ref1, ref2 = torch.chunk(cross_attn_map, 2, dim=-1)
+        # ref1 = ref1.squeeze(-1).cpu().numpy()
+        # ref2 = ref2.squeeze(-1).cpu().numpy()
+        # ref1 = (ref1 - ref1.min()) / (ref1.max() - ref1.min())
+        # ref2 = (ref2 - ref2.min()) / (ref2.max() - ref2.min())
+        # cv2.imwrite("camap1.jpg", ref1 * 255)
+        # cv2.imwrite("camap2.jpg", ref2 * 255)

@@ -45,7 +45,7 @@ class BurstDataset(BaseDataset):
         return item_with_collage
 
     def __len__(self):
-        return 20000
+        return 4000
     
     def load_caption(self, idx):
         if idx not in self.caption:

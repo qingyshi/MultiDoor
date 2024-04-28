@@ -17,7 +17,7 @@ class PVSGDataset(BaseDataset):
         self.dynamic = 2
 
     def __len__(self):
-        return 20000
+        return 2000
     
     def get_sample(self, index):
         data = self.data[index]

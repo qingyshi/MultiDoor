@@ -47,7 +47,7 @@ class OVISDataset(BaseDataset):
         return vid_infos
 
     def __len__(self):
-        return 20000
+        return 2000
     
     def get_sample(self, idx):
         video_id = self.data[idx]

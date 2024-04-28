@@ -23,7 +23,7 @@ class VIPSegDataset(BaseDataset):
         self.dynamic = 1   
     
     def __len__(self):
-        return 10000
+        return 1000
 
     def check_region_size(self, image, yyxx, ratio, mode = 'max'):
         pass_flag = True

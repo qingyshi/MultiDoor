@@ -21,7 +21,7 @@ if save_memory:
     enable_sliced_attention()
 
 # Configs
-resume_path = 'checkpoints/sd_ini.ckpt'
+resume_path = 'lightning_logs/version_6/checkpoints/epoch=4-step=81249.ckpt'
 batch_size = 2
 logger_freq = 2000
 learning_rate = 1e-5
@@ -55,12 +55,12 @@ dataset12 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)
 dataset13 = VIPSegDataset(**DConf.Train.VIPSeg)
 
 image_data = [dataset1, dataset2, dataset3]
-video_data = [dataset4, dataset5, dataset6, dataset7, dataset8, dataset9, dataset10, dataset11, dataset12]
+video_data = [dataset4, dataset5, dataset6, dataset7, dataset8, dataset9, dataset10, dataset11, dataset12, dataset13]
 
 # The ratio of each dataset is adjusted by setting the __len__ 
 dataset = ConcatDataset(image_data + video_data)
 dataloader = DataLoader(dataset, num_workers=8, batch_size=batch_size, shuffle=True)
-logger = ImageLogger(batch_frequency=logger_freq, split="train")
+logger = ImageLogger(batch_frequency=logger_freq, split="less_video")
 trainer = pl.Trainer(
     gpus=n_gpus,
     strategy="ddp",

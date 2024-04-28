@@ -41,7 +41,7 @@ class LVVISDataset(BaseDataset):
         return vid_infos
 
     def __len__(self):
-        return 10000
+        return 2000
     
     def get_sample(self, idx):
         video_id = self.data[idx]
