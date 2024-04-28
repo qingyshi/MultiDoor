@@ -270,7 +270,7 @@ class FrozenOpenCLIPImageEncoder(AbstractEncoder):
         return self(image)
 
 sys.path.append("./dinov2")
-import hubconf
+import hubconfv2
 from einops import rearrange
 from omegaconf import OmegaConf
 config_path = './configs/anydoor.yaml'
@@ -283,7 +283,7 @@ class FrozenDinoV2Encoder(AbstractEncoder):
     """
     def __init__(self, device="cuda", freeze=True):
         super().__init__()
-        dinov2 = hubconf.dinov2_vitg14() 
+        dinov2 = hubconfv2.dinov2_vitg14() 
         state_dict = torch.load(DINOv2_weight_path)
         dinov2.load_state_dict(state_dict, strict=False)
         self.model = dinov2.to(device)

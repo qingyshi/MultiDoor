@@ -81,5 +81,3 @@ model:
     cond_stage_config:
       target: ldm.modules.encoders.modules.FrozenDinoV2Encoder
       weight: checkpoints/dinov2_vitg14_pretrain.pth
-    
-

@@ -221,11 +221,11 @@ def inference_single_image(ref_image, ref_mask, tar_image, tar_mask, guidance_sc
 
 def run_and_save(reference_image_path=None, bg_image_path=None, save_path=None):
     # ==== Example for inferring a single image ===
-    reference_image_path = 'examples/dataset/clock/01.jpg'
-    reference_mask_path = reference_image_path.replace("jpg", "png")
-    bg_image_path = 'examples/TestDreamBooth/BG/000000309203_GT.png'
-    bg_mask_path = 'examples/TestDreamBooth/BG/000000047948_mask.png'
-    save_path = 'examples/TestDreamBooth/GEN/gen_res11.png'
+    reference_image_path = 'examples/cocovalv2/person_surfboard/68/ref2.jpg'
+    reference_mask_path = 'examples/cocovalv2/cat_dog/0/0.png'
+    bg_image_path = 'test.jpg'
+    bg_mask_path = 'examples/cocovalv2/person_surfboard/20/1.png'
+    save_path = 'test2.jpg'
 
     # reference image + reference mask
     # You could use the demo of SAM to extract RGB-A image with masks
@@ -233,7 +233,7 @@ def run_and_save(reference_image_path=None, bg_image_path=None, save_path=None):
     image = cv2.imread( reference_image_path, cv2.IMREAD_UNCHANGED)
     # mask = (image[:,:,-1] > 128).astype(np.uint8)
     # image = image[:,:,:-1]
-    mask = cv2.imread( reference_mask_path )[:, :, 0] > 128
+    mask = image.sum(-1) != 255 * 3
     mask = mask.astype(np.uint8)
     image = cv2.cvtColor(image.copy(), cv2.COLOR_BGR2RGB)
     ref_image = image 
@@ -252,7 +252,7 @@ def run_and_save(reference_image_path=None, bg_image_path=None, save_path=None):
     ref_image = cv2.resize(ref_image, (w,h))
     vis_image = cv2.hconcat([ref_image, back_image, gen_image])
     
-    cv2.imwrite(save_path, vis_image [:,:,::-1])
+    cv2.imwrite(save_path, gen_image[:,:,::-1])
     #'''
     # ==== Example for inferring VITON-HD Test dataset ===
 
