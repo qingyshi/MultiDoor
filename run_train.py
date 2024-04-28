@@ -27,9 +27,9 @@ logger_freq = 2000
 learning_rate = 1e-5
 sd_locked = False
 only_mid_control = False
-gpus = [2, 3]
+gpus = 4
 accumulate_grad_batches = 2
-max_epochs = 12
+max_epochs = 9
 
 # First use cpu to load models. Pytorch Lightning will automatically move it to GPUs.
 model = create_model('./configs/multidoor.yaml').cpu()
@@ -43,19 +43,19 @@ DConf = OmegaConf.load('./configs/datasets.yaml')
 dataset1 = HICODataset(**DConf.Train.HICO.Train)
 dataset2 = HICOTestDataset(**DConf.Train.HICO.Test)
 dataset3 = PSGDataset(**DConf.Train.PSG)
-dataset4 = BurstDataset(**DConf.Train.Burst.Train)
-dataset5 = BurstDataset(**DConf.Train.Burst.Val)
-dataset6 = BurstDataset(**DConf.Train.Burst.Test)
-dataset7 = LVVISDataset(**DConf.Train.LVVIS)
-dataset8 = OVISDataset(**DConf.Train.OVIS)
+# dataset4 = BurstDataset(**DConf.Train.Burst.Train)
+# dataset5 = BurstDataset(**DConf.Train.Burst.Val)
+# dataset6 = BurstDataset(**DConf.Train.Burst.Test)
+# dataset7 = LVVISDataset(**DConf.Train.LVVIS)
+# dataset8 = OVISDataset(**DConf.Train.OVIS)
 dataset9 = PVSGDataset(**DConf.Train.PVSG)
-dataset10 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
-dataset11 = YoutubeVISDataset(**DConf.Train.YoutubeVIS)
-dataset12 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)
-dataset13 = VIPSegDataset(**DConf.Train.VIPSeg)
+# dataset10 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
+# dataset11 = YoutubeVISDataset(**DConf.Train.YoutubeVIS)
+# dataset12 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)
+# dataset13 = VIPSegDataset(**DConf.Train.VIPSeg)
 
 image_data = [dataset1, dataset2, dataset3]
-video_data = [dataset4, dataset5, dataset6, dataset7, dataset8, dataset9, dataset10, dataset11, dataset12, dataset13]
+video_data = [dataset9]
 
 # The ratio of each dataset is adjusted by setting the __len__ 
 dataset = ConcatDataset(image_data + video_data)
