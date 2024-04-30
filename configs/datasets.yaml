@@ -79,17 +79,23 @@ Train:
     annotation: /data00/datasets/coco/annotations/instances_val2017.json
 
   HICO:
-    root: /data00/multidoor_dataset/hico  # path to the hicodet dir
-    image_dir: images/train2015   # don't change
-    mask_dir: relationships   # dont't change
-    annotation: instances_train2015.json  # don't change
+    Train:
+      root: /data00/multidoor_dataset/hico  # path to the hicodet dir
+      image_dir: images/train2015   # don't change
+      mask_dir: relationships   # dont't change
+      annotation: instances_train2015.json  # don't change
+    Test:
+      root: /data00/multidoor_dataset/hico  # path to the hicodet dir
+      image_dir: images/test2015   # don't change
+      mask_dir: relationships_test   # dont't change
+      annotation: instances_test2015.json  # don't change
   
   PSG:
     root: /data00/datasets/coco # path to coco dir
-    relation: /data00/psg/psg.json  # path to json file
+    relation: /data00/multidoor_dataset/psg/psg.json  # path to json file
 
   PVSG:
-    data_root: /data00/OpenPVSG/data  # path to {data/OpenPVSG/data} dir
+    data_root: /data00/multidoor_dataset/OpenPVSG/data  # path to {data/OpenPVSG/data} dir
 
 
 Test:

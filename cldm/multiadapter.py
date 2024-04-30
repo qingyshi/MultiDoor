@@ -29,7 +29,7 @@ class MultiAdapter(LatentDiffusion):
         b, _, h, w = inpaint.shape
         mask = F.interpolate(mask, size=(h, w), mode="nearest")
         ref_image = batch[self.ref_image_key] # ref_image.shape: (b, n, 224, 224, 3)
-        image_token = self.image_encoder(ref_image) # image_token.shape: (b, n * 25, 1024)
+        image_token = self.image_encoder(ref_image) # image_token.shape: (b, n * 256, 1024)
         cond = dict(
             c_crossattn=c,
             c_concat = torch.cat([inpaint, mask], dim=1),
@@ -102,7 +102,9 @@ class MultiAdapter(LatentDiffusion):
 
         if sample:
             # get denoise row
-            samples, z_denoise_row = self.sample_log(cond={"c_concat": c_cat, "c_crossattn": c, "image_token": ref},
+            samples, z_denoise_row = self.sample_log(cond={"c_concat": c_cat, 
+                                                           "c_crossattn": c, 
+                                                           "image_token": ref},
                                                      batch_size=N, ddim=use_ddim,
                                                      ddim_steps=ddim_steps, eta=ddim_eta)
             x_samples = self.decode_first_stage(samples)
@@ -134,7 +136,7 @@ class MultiAdapter(LatentDiffusion):
     def get_unconditional_conditioning(self, num_samples, image_guidance=True):
         if image_guidance:
             uncond = torch.zeros((num_samples, 2, 224, 224, 3)).to('cuda')
-            uncond = self.img_encoder(uncond)
+            uncond = self.image_encoder(uncond)
         else:
             uncond = [" "] * num_samples
             uncond = self.cond_stage_model(uncond)

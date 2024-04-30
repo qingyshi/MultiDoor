@@ -47,7 +47,7 @@ class PSGDataset(BaseDataset):
         
         masks = [mask == id for id in objects_id]
         item_with_collage = self.process_pairs(ref_image=img, ref_mask=masks, 
-                                tar_image=img.copy(), tar_mask=masks.copy())
+                                               tar_image=img.copy(), tar_mask=masks.copy())
         sampled_time_steps = self.sample_timestep()
         
         item_with_collage['time_steps'] = sampled_time_steps
