@@ -402,7 +402,7 @@ if __name__ == '__main__':
     # bg_image_path = 'examples/background/03/00.png'
     # bg_mask_path = [bg_image_path.replace("00.png", "mask_0.png"), bg_image_path.replace("00.png", "mask_1.png")]
     # need_process = True
-    reference_image_path = ['examples/cocovalv2/dog_dog/22/ref1.jpg', 'examples/cocovalv2/bench_cat/1/ref2.jpg']
+    reference_image_path = ['examples/cocoval/dog_dog/22/ref1.jpg', 'examples/cocoval/bench_cat/1/ref2.jpg']
     reference_bg_path = [os.path.join(os.path.dirname(image_path), "bg.jpg") for image_path in reference_image_path]
     bg_id = 11
     bg_image_path = f'examples/cocovalv2/dog_dog/3/bg.jpg'
