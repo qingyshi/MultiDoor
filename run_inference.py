@@ -409,8 +409,8 @@ if __name__ == '__main__':
     bg_mask_path = [bg_image_path.replace("bg.jpg", "0.png"), bg_image_path.replace("bg.jpg", "1.png")]
     need_process = False
     
-    caption = "The cat is surfing the surfboard."
-    nouns = ["cat", "surfboard"]
+    caption = "The cat is surfing the board."
+    nouns = ["cat", "board"]
     class_name = "_".join(nouns)
     start = 1
        

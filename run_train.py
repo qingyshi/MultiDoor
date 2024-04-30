@@ -21,7 +21,7 @@ if save_memory:
     enable_sliced_attention()
 
 # Configs
-resume_path = 'checkpoints/sd_ini.ckpt'
+resume_path = '/data00/sqy/checkpoints/anydoor/v2/epoch=8-step=61874.ckpt'
 batch_size = 2
 logger_freq = 2000
 learning_rate = 1e-5
@@ -29,7 +29,7 @@ sd_locked = False
 only_mid_control = False
 gpus = 4
 accumulate_grad_batches = 2
-max_epochs = 9
+max_epochs = 15
 
 # First use cpu to load models. Pytorch Lightning will automatically move it to GPUs.
 model = create_model('./configs/multidoor.yaml').cpu()
