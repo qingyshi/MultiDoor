@@ -293,7 +293,7 @@ class FrozenMultiDoorEncoder(AbstractEncoder):
             self.freeze()
         self.image_mean = torch.tensor([0.485, 0.456, 0.406]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
         self.image_std =  torch.tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
-        self.project = nn.linear(1536, 1024)
+        self.project = nn.Linear(1536, 1024)
 
     def freeze(self):
         self.model.eval()

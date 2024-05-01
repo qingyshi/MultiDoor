@@ -18,7 +18,7 @@ from ldm.util import log_txt_as_img, exists, instantiate_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
 
 
-class ControllePdUnetModel(UNetModel):
+class ControlledUnetModel(UNetModel):
     def forward(self, x, timesteps=None, context=None, ip=None, control=None, only_mid_control=False, **kwargs):
         hs = []
         with torch.no_grad():

@@ -338,6 +338,7 @@ class BasicTransformerBlock(nn.Module):
                               heads=n_heads, dim_head=d_head, dropout=dropout)  # is self-attn if context is none
         self.adapter = attn_cls(query_dim=dim, context_dim=context_dim,
                                 heads=n_heads, dim_head=d_head, dropout=dropout)  # is self-attn if context is none
+        self.gamma = nn.Parameter(torch.tensor([0.0]))
 
         self.norm1 = nn.LayerNorm(dim)
         self.norm2 = nn.LayerNorm(dim)
@@ -348,7 +349,7 @@ class BasicTransformerBlock(nn.Module):
     def forward(self, x, context=None, ip=None):
         x = self.attn1(self.norm1(x), context=context if self.disable_self_attn else None) + x
         if ip is not None:
-            x = self.adapter(self.norm_adapter(x), context=ip) + x
+            x = self.gamma * self.adapter(self.norm_adapter(x), context=ip) + x
         x = self.attn2(self.norm2(x), context=context) + x
         x = self.ff(self.norm3(x)) + x
         return x

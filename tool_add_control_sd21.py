@@ -15,7 +15,7 @@ from share import *
 from cldm.model import create_model
 
 
-# python tool_add_fuser_sd21.py /data00/sqy/checkpoints/stable-diffusion-2-1-base/v2-1_512-ema-pruned.ckpt checkpoints/sd_ini.ckpt
+# python tool_add_control_sd21.py /data00/sqy/checkpoints/stable-diffusion-2-1-base/v2-1_512-ema-pruned.ckpt checkpoints/control_sd21_ini.ckpt
 
 def get_node_name(name, parent_name):
     if len(name) <= len(parent_name):
@@ -24,6 +24,7 @@ def get_node_name(name, parent_name):
     if p != parent_name:
         return False, ''
     return True, name[len(parent_name):]
+
 
 model = create_model(config_path='./configs/multidoor.yaml')
 
@@ -35,12 +36,20 @@ scratch_dict = model.state_dict()
 
 target_dict = {}
 for k in scratch_dict.keys():
-    if "input_blocks.0" in k:
-        print(f"skip weights: {k}")
+    if 'control_model.input_blocks.0.0' in k:
+        print('skipped key: ', k)
         continue
+    is_control, name = get_node_name(k, 'control_')     # name: "model.xxxx"
+    
+    if "adapter" in k:
+        copy_k = k.replace("adapter", "attn2")
+    elif "norm_adapter" in k:
+        copy_k = k.replace("norm_adapter", "norm2")
+    elif is_control:
+        copy_k = 'model.diffusion_' + name
     else:
         copy_k = k
-      
+        
     if copy_k in pretrained_weights:
         target_dict[k] = pretrained_weights[copy_k].clone()
     else:

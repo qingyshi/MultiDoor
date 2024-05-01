@@ -21,15 +21,15 @@ if save_memory:
     enable_sliced_attention()
 
 # Configs
-resume_path = 'checkpoints/sd_ini.ckpt'
-batch_size = 2
+resume_path = 'checkpoints/control_sd21_ini.ckpt'
+batch_size = 4
 logger_freq = 2000
 learning_rate = 1e-5
 sd_locked = False
 only_mid_control = False
 gpus = 4
-accumulate_grad_batches = 2
-max_epochs = 9
+accumulate_grad_batches = 1
+max_epochs = 24
 
 # First use cpu to load models. Pytorch Lightning will automatically move it to GPUs.
 model = create_model('./configs/multidoor.yaml').cpu()
@@ -60,7 +60,7 @@ video_data = [dataset9]
 # The ratio of each dataset is adjusted by setting the __len__ 
 dataset = ConcatDataset(image_data + video_data)
 dataloader = DataLoader(dataset, num_workers=8, batch_size=batch_size, shuffle=True)
-logger = ImageLogger(batch_frequency=logger_freq, split="v2")
+logger = ImageLogger(batch_frequency=logger_freq, split="v3")
 trainer = pl.Trainer(
     gpus=gpus,
     strategy="ddp",

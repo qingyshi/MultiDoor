@@ -155,58 +155,25 @@ class MultiDoorTextEncoder(CLIPPreTrainedModel):
             attentions=encoder_outputs.attentions,
         )
 
-class BalancedL1Loss(nn.Module):
-    def __init__(self, threshold=1.0, normalize=False):
-        super().__init__()
-        self.threshold = threshold
-        self.normalize = normalize
-
-    def forward(self, object_token_attn_prob, object_segmaps):
-        if self.normalize:
-            object_token_attn_prob = object_token_attn_prob / (
-                object_token_attn_prob.max(dim=2, keepdim=True)[0] + 1e-5
-            )
-        background_segmaps = 1 - object_segmaps
-        background_segmaps_sum = background_segmaps.sum(dim=2) + 1e-5
-        object_segmaps_sum = object_segmaps.sum(dim=2) + 1e-5
-
-        background_loss = (object_token_attn_prob * background_segmaps).sum(
-            dim=2
-        ) / background_segmaps_sum
-
-        object_loss = (object_token_attn_prob * object_segmaps).sum(
-            dim=2
-        ) / object_segmaps_sum
-
-        return background_loss - object_loss
 
 class MultiDoor(LatentDiffusion):
     def __init__(
         self, 
         image_key, 
         inpaint_image_key, 
-        object_localization,
-        object_localization_weight,
-        object_localization_threshold,
-        object_localization_normalize,
+        control_stage_config,
         image_cond_config, 
         fusion_stage_config, 
         *args, 
         **kwargs
     ):
         super().__init__(*args, **kwargs)
+        self.control_model = instantiate_from_config(control_stage_config)
         self.image_encoder = instantiate_from_config(image_cond_config)
         self.fuser: MultiDoorPostfuseModule = instantiate_from_config(fusion_stage_config)
         self.image_key = image_key
         self.inpaint_image_key = inpaint_image_key
         self.pad_token_id = 0
-    
-    def _clear_cross_attention_scores(self, ):
-        if hasattr(self, "cross_attn_map_store"):
-            keys = list(self.cross_attn_map_store.keys())
-            for k in keys:
-                del self.cross_attn_map_store[k]
-        gc.collect()
     
     def get_input(self, batch, k, *args, **kwargs):
         x, c = super().get_input(batch, k, *args, **kwargs)
@@ -216,19 +183,13 @@ class MultiDoor(LatentDiffusion):
             text_token = c
         else:
             raise Exception
+
+        self.time_steps = batch.get('time_steps')
         control = batch[self.inpaint_image_key]
         control = control.to(self.device)
         control = rearrange(control, 'b h w c -> b c h w')
         control = control.to(memory_format=torch.contiguous_format).float()
-        self.time_steps = batch.get('time_steps')
-        # cond['c_crossattn'].shape: (b, 77, 1024)
-        inpaint = control[:, :3, :, :]
-        mask = control[:, -1, :, :].unsqueeze(1)
-        inpaint = self.encode_first_stage(inpaint)  # (b, 4, 64, 64)
-        inpaint = self.get_first_stage_encoding(inpaint).detach()
-        b, _, h, w = inpaint.shape
-        mask = F.interpolate(mask, size=(h, w), mode="nearest")
-        c_concat = torch.cat([inpaint, mask], dim=1)
+
         image = batch[self.image_key] # image.shape: (b, n, 224, 224, 3)
         patch_token, cls_token = self.image_encoder(image) # cls_token.shape: (b, n, 1, 1536)
         
@@ -248,8 +209,8 @@ class MultiDoor(LatentDiffusion):
         cond = dict(
             c_ip = patch_token,    # (b, n * 256, 1024)
             c_crossattn = context,
-            c_concat = c_concat,
-            hf_map = control[:, :3, :, :],
+            c_concat = control,
+            hf_map = control[:, :3],
             image_token_ids = image_token_ids,
             image_token_ids_mask = image_token_ids_mask,
             target_masks = target_masks            
@@ -262,32 +223,32 @@ class MultiDoor(LatentDiffusion):
         ip = cond['c_ip']
         context = cond['c_crossattn']
         inpaint = cond['c_concat']
-        control = self.control_model(x=x_noisy, hint=inpaint, timesteps=t, context=context)
+        control = self.control_model(x=x_noisy, hint=inpaint, timesteps=t, context=ip)
         eps = diffusion_model(x=x_noisy, timesteps=t, context=context, ip=ip, control=control)
         return eps
     
     def configure_optimizers(self):
         lr = self.learning_rate
         params = list(self.fuser.parameters())
-        for name, param in self.model.diffusion_model.named_parameters():
-            if "adapter" in name and "to_k" in name:
-                params.append(param)
-            elif "adapter" in name and "to_v" in name:
-                params.append(param)
-        
-                
-        
-        params += list(self.model.diffusion_model.parameters())
-        params.append(self.image_encoder.objects_token)
+        params += list(self.image_encoder.project.parameters())
+        params += list(self.control_model.parameters())
+        params += list(self.model.diffusion_model.output_blocks.parameters())
+        params += list(self.model.diffusion_model.out.parameters())
         opt = torch.optim.AdamW(params, lr=lr)
         return opt
     
     @torch.no_grad()
-    def log_images(self, batch, N=4, n_row=2, sample=False, ddim_steps=50, ddim_eta=0.0, return_keys=None,
-                   quantize_denoised=True, inpaint=True, plot_denoise_rows=False, plot_progressive_rows=True,
-                   plot_diffusion_rows=False, unconditional_guidance_scale=9.0, unconditional_guidance_label=None,
-                   use_ema_scope=True,
-                   **kwargs):
+    def log_images(
+        self, 
+        batch, 
+        N=4, 
+        n_row=2, 
+        sample=False, 
+        ddim_steps=50, 
+        ddim_eta=0.0, 
+        unconditional_guidance_scale=9.0,
+        **kwargs
+    ):
         use_ddim = ddim_steps is not None
 
         log = dict()
@@ -295,7 +256,7 @@ class MultiDoor(LatentDiffusion):
             if isinstance(value, torch.Tensor):
                 batch[key] = value[:N]
         z, cond = self.get_input(batch, self.first_stage_key, bs=N)
-        c_cat, context = cond["c_concat"], cond["c_crossattn"]
+        c_cat, context, ip = cond["c_concat"], cond["c_crossattn"], cond["c_ip"]
         N = min(z.shape[0], N)
         n_row = min(z.shape[0], n_row)
         log["reconstruction"] = self.decode_first_stage(z) 
@@ -310,40 +271,13 @@ class MultiDoor(LatentDiffusion):
         cond_image = batch[self.image_key][:N].clone()    # (b, 2, 224, 224, 3)
         cond_image = torch.cat([cond_image[:, i, ...] for i in range(cond_image.shape[1])], dim=2)
         log["conditioning"] = torch.permute(cond_image, (0, 3, 1, 2)) * 2.0 - 1.0  
-        if plot_diffusion_rows:
-            # get diffusion row
-            diffusion_row = list()
-            z_start = z[:n_row]
-            for t in range(self.num_timesteps):
-                if t % self.log_every_t == 0 or t == self.num_timesteps - 1:
-                    t = repeat(torch.tensor([t]), '1 -> b', b=n_row)
-                    t = t.to(self.device).long()
-                    noise = torch.randn_like(z_start)
-                    z_noisy = self.q_sample(x_start=z_start, t=t, noise=noise)
-                    diffusion_row.append(self.decode_first_stage(z_noisy))
-
-            diffusion_row = torch.stack(diffusion_row)  # n_log_step, n_row, C, H, W
-            diffusion_grid = rearrange(diffusion_row, 'n b c h w -> b n c h w')
-            diffusion_grid = rearrange(diffusion_grid, 'b n c h w -> (b n) c h w')
-            diffusion_grid = make_grid(diffusion_grid, nrow=diffusion_row.shape[0])
-            log["diffusion_row"] = diffusion_grid
-
-        if sample:
-            # get denoise row
-            samples, z_denoise_row = self.sample_log(cond={"c_concat": c_cat, "c_crossattn": context},
-                                                     batch_size=N, ddim=use_ddim,
-                                                     ddim_steps=ddim_steps, eta=ddim_eta)
-            x_samples = self.decode_first_stage(samples)
-            log["samples"] = x_samples
-            if plot_denoise_rows:
-                denoise_grid = self._get_denoise_row_from_list(z_denoise_row)
-                log["denoise_row"] = denoise_grid
-
+        
         if unconditional_guidance_scale > 1.0:
-            uc_cross = self.get_unconditional_conditioning(N)
-            uc_cat = c_cat  # torch.zeros_like(c_cat)
-            uc_full = {"c_concat": uc_cat, "c_crossattn": uc_cross}
-            samples_cfg, _ = self.sample_log(cond={"c_concat": c_cat, "c_crossattn": context},
+            uc_text, uc_image = self.get_unconditional_conditioning(N)
+            uc_full = {"c_concat": c_cat, "c_crossattn": uc_text, "c_ip": uc_image}
+            samples_cfg, _ = self.sample_log(cond={"c_concat": c_cat, 
+                                                   "c_crossattn": context,
+                                                   "c_ip": ip},
                                              batch_size=N, 
                                              ddim=use_ddim,
                                              ddim_steps=ddim_steps, 
@@ -356,6 +290,7 @@ class MultiDoor(LatentDiffusion):
     
     @torch.no_grad()
     def get_unconditional_conditioning(self, num_samples):
-        uncond = torch.tensor([self.pad_token_id] * num_samples).unsqueeze(1).repeat(1, 77).to("cuda")
-        uncond = self.cond_stage_model(uncond).last_hidden_state
-        return uncond   # (b, 77, 1024)
+        uncond_text = torch.tensor([self.pad_token_id] * num_samples).unsqueeze(1).repeat(1, 77).cuda()
+        uncond_text = self.cond_stage_model(uncond_text).last_hidden_state
+        uncond_image = torch.zeros(num_samples, 512, 1024).cuda()
+        return uncond_text, uncond_image   # (b, 77, 1024)
