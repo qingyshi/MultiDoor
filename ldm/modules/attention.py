@@ -328,7 +328,6 @@ class BasicTransformerBlock(nn.Module):
                  disable_self_attn=False):
         super().__init__()
         attn_mode = "softmax-xformers" if XFORMERS_IS_AVAILBLE else "softmax"
-        attn_mode = "softmax"
         assert attn_mode in self.ATTENTION_MODES
         attn_cls = self.ATTENTION_MODES[attn_mode]
         self.disable_self_attn = disable_self_attn
@@ -337,17 +336,19 @@ class BasicTransformerBlock(nn.Module):
         self.ff = FeedForward(dim, dropout=dropout, glu=gated_ff)
         self.attn2 = attn_cls(query_dim=dim, context_dim=context_dim,
                               heads=n_heads, dim_head=d_head, dropout=dropout)  # is self-attn if context is none
+        self.adapter = attn_cls(query_dim=dim, context_dim=context_dim,
+                                heads=n_heads, dim_head=d_head, dropout=dropout)  # is self-attn if context is none
 
         self.norm1 = nn.LayerNorm(dim)
         self.norm2 = nn.LayerNorm(dim)
         self.norm3 = nn.LayerNorm(dim)
+        self.norm_adapter = nn.LayerNorm(dim)
         self.checkpoint = checkpoint
-
-    def forward(self, x, context=None):
-        return checkpoint(self._forward, (x, context), self.parameters(), self.checkpoint)
         
-    def _forward(self, x, context=None):
+    def forward(self, x, context=None, ip=None):
         x = self.attn1(self.norm1(x), context=context if self.disable_self_attn else None) + x
+        if ip is not None:
+            x = self.adapter(self.norm_adapter(x), context=ip) + x
         x = self.attn2(self.norm2(x), context=context) + x
         x = self.ff(self.norm3(x)) + x
         return x
@@ -396,7 +397,7 @@ class SpatialTransformer(nn.Module):
             self.proj_out = zero_module(nn.Linear(in_channels, inner_dim))
         self.use_linear = use_linear
 
-    def forward(self, x, context=None):
+    def forward(self, x, context=None, ip=None):
         # note: if no context is given, cross-attention defaults to self-attention  
         b, c, h, w = x.shape
         x_in = x
@@ -407,7 +408,7 @@ class SpatialTransformer(nn.Module):
         if self.use_linear:
             x = self.proj_in(x)
         for i, block in enumerate(self.transformer_blocks):
-            x = block(x, context=context)
+            x = block(x, context=context, ip=ip)
         if self.use_linear:
             x = self.proj_out(x)
         x = rearrange(x, 'b (h w) c -> b c h w', h=h, w=w).contiguous()

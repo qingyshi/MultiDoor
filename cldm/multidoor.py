@@ -199,16 +199,6 @@ class MultiDoor(LatentDiffusion):
         self.fuser: MultiDoorPostfuseModule = instantiate_from_config(fusion_stage_config)
         self.image_key = image_key
         self.inpaint_image_key = inpaint_image_key
-        self.object_localization = object_localization
-        self.object_localization_weight = object_localization_weight
-        if self.object_localization:
-            self.cross_attn_map_store = {}
-            unet = self.model.diffusion_model
-            self.model.diffusion_model = add_unet_crossattn_map_store(unet, self.cross_attn_map_store)
-            self.object_localization_loss_fn = BalancedL1Loss(
-                object_localization_threshold,
-                object_localization_normalize,
-            )
         self.pad_token_id = 0
     
     def _clear_cross_attention_scores(self, ):
@@ -240,7 +230,7 @@ class MultiDoor(LatentDiffusion):
         mask = F.interpolate(mask, size=(h, w), mode="nearest")
         c_concat = torch.cat([inpaint, mask], dim=1)
         image = batch[self.image_key] # image.shape: (b, n, 224, 224, 3)
-        image_token = self.image_encoder(image) # image_token.shape: (b, n, 1, 1536)
+        patch_token, cls_token = self.image_encoder(image) # cls_token.shape: (b, n, 1, 1536)
         
         image_token_masks = batch["image_token_masks"]  # (b, 77)
         image_token_ids = batch["image_token_ids"]  # (b, max_num_objects)
@@ -250,12 +240,13 @@ class MultiDoor(LatentDiffusion):
         
         context = self.fuser(
             text_token, # (b, 77, 1024)
-            image_token,    # (b, n, 1, 1536)
+            cls_token,    # (b, n, 1, 1536)
             image_token_masks,  # (b, 77)
             num_objects, # (b, 1)
         )
         
         cond = dict(
+            c_ip = patch_token,    # (b, n * 256, 1024)
             c_crossattn = context,
             c_concat = c_concat,
             hf_map = control[:, :3, :, :],
@@ -268,35 +259,25 @@ class MultiDoor(LatentDiffusion):
     def apply_model(self, x_noisy, t, cond, *args, **kwargs):
         assert isinstance(cond, dict)
         diffusion_model = self.model.diffusion_model
+        ip = cond['c_ip']
         context = cond['c_crossattn']
         inpaint = cond['c_concat']
-        input = torch.cat([x_noisy, inpaint], dim=1) # (b, 9, h, w)
-        eps = diffusion_model(x=input, timesteps=t, context=context)
+        control = self.control_model(x=x_noisy, hint=inpaint, timesteps=t, context=context)
+        eps = diffusion_model(x=x_noisy, timesteps=t, context=context, ip=ip, control=control)
         return eps
-    
-    def p_losses(self, x_start, cond, t, noise=None):
-        loss, loss_dict = super().p_losses(x_start, cond, t)
-        if self.object_localization:
-            target_masks = cond["target_masks"]    # (bsz, 2, 512, 512)
-            image_token_ids = cond["image_token_ids"]   # (bsz, 2)
-            image_token_ids_mask = cond["image_token_ids_mask"]    # (bsz, 2)
-            localization_loss = get_object_localization_loss(
-                self.cross_attn_map_store,
-                target_masks,     # (bsz, 2, 512, 512)
-                image_token_ids,    # (bsz, 2)
-                image_token_ids_mask,   # (bsz, 2)
-                self.object_localization_loss_fn,
-            )
-            loss_dict["localization_loss"] = localization_loss
-            loss = self.object_localization_weight * localization_loss + loss
-            self._clear_cross_attention_scores()
-        return loss, loss_dict
     
     def configure_optimizers(self):
         lr = self.learning_rate
-        params = list(self.image_encoder.model.blocks[-2:].parameters())
+        params = list(self.fuser.parameters())
+        for name, param in self.model.diffusion_model.named_parameters():
+            if "adapter" in name and "to_k" in name:
+                params.append(param)
+            elif "adapter" in name and "to_v" in name:
+                params.append(param)
+        
+                
+        
         params += list(self.model.diffusion_model.parameters())
-        params += list(self.fuser.parameters())
         params.append(self.image_encoder.objects_token)
         opt = torch.optim.AdamW(params, lr=lr)
         return opt

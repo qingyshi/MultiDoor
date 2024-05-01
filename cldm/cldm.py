@@ -18,17 +18,17 @@ from ldm.util import log_txt_as_img, exists, instantiate_from_config
 from ldm.models.diffusion.ddim import DDIMSampler
 
 
-class ControlledUnetModel(UNetModel):
-    def forward(self, x, timesteps=None, context=None, control=None, only_mid_control=False, **kwargs):
+class ControllePdUnetModel(UNetModel):
+    def forward(self, x, timesteps=None, context=None, ip=None, control=None, only_mid_control=False, **kwargs):
         hs = []
         with torch.no_grad():
             t_emb = timestep_embedding(timesteps, self.model_channels, repeat_only=False)
             emb = self.time_embed(t_emb)
             h = x.type(self.dtype)
             for module in self.input_blocks:
-                h = module(h, emb, context)
+                h = module(h, emb, context, ip)
                 hs.append(h)
-            h = self.middle_block(h, emb, context)
+            h = self.middle_block(h, emb, context, ip)
 
         if control is not None:
             h += control.pop()
@@ -38,7 +38,7 @@ class ControlledUnetModel(UNetModel):
                 h = torch.cat([h, hs.pop()], dim=1)
             else:
                 h = torch.cat([h, hs.pop() + control.pop()], dim=1)
-            h = module(h, emb, context)
+            h = module(h, emb, context, ip)
 
         h = h.type(x.dtype)
         return self.out(h)
@@ -204,7 +204,7 @@ class ControlNet(nn.Module):
                             ) if not use_spatial_transformer else SpatialTransformer(
                                 ch, num_heads, dim_head, depth=transformer_depth, context_dim=context_dim,
                                 disable_self_attn=disabled_sa, use_linear=use_linear_in_transformer,
-                                use_checkpoint=use_checkpoint, is_controlnet=True
+                                use_checkpoint=use_checkpoint,
                             )
                         )
                 self.input_blocks.append(TimestepEmbedSequential(*layers))
@@ -263,7 +263,7 @@ class ControlNet(nn.Module):
             ) if not use_spatial_transformer else SpatialTransformer(  # always uses a self-attn
                 ch, num_heads, dim_head, depth=transformer_depth, context_dim=context_dim,
                 disable_self_attn=disable_middle_self_attn, use_linear=use_linear_in_transformer,
-                use_checkpoint=use_checkpoint, is_controlnet=True
+                use_checkpoint=use_checkpoint,
             ),
             ResBlock(
                 ch,
@@ -295,11 +295,11 @@ class ControlNet(nn.Module):
                 h = guided_hint
                 guided_hint = None
             else:
-                h_new = module(h, emb, caption=context) 
+                h_new = module(h, emb, context) 
                 h =  h_new 
             outs.append(zero_conv(h, emb, context))
 
-        h_new = self.middle_block(h, emb, caption=context)  
+        h_new = self.middle_block(h, emb, context)  
         outs.append(self.middle_block_out(h_new, emb, context))        
         return outs
 
