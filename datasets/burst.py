@@ -9,7 +9,12 @@ from .base import BaseDataset
 
 
 class BurstDataset(BaseDataset):
-    def __init__(self, annotations_file, images_base_dir, caption):
+    def __init__(
+        self, 
+        annotations_file,
+        images_base_dir, 
+        caption
+    ):
         super().__init__()
         self.data = BURSTDataset(annotations_file, images_base_dir)
         self.id2name = self.data.category_names

@@ -66,3 +66,10 @@ Train:
     ann_file: /data00/multidoor_dataset/LVVIS/train_instances_.json
     img_prefix: /data00/multidoor_dataset/LVVIS/train/JPEGImages
     caption: /data/home/sqy/PythonProjects/multimodal/LLaVA/noun_caption_lvvis.json
+  
+  OpenImages:
+    root: /data00/multidoor_dataset/OpenImages
+    image_dir: test_images
+    mask_dir: masks/test_mask
+    annotations: test-annotations-object-segmentation.csv
+    id2name: oidv7-class-descriptions.csv

@@ -10,6 +10,7 @@ from datasets.vg import VGDataset
 from datasets.burst import BurstDataset
 from datasets.ovis import OVISDataset
 from datasets.lvvis import LVVISDataset
+from datasets.openimages import OpenImagesDataset
 from torch.utils.data import ConcatDataset
 from torch.utils.data import DataLoader
 import numpy as np
@@ -22,25 +23,26 @@ from omegaconf import OmegaConf
 
 # Datasets
 DConf = OmegaConf.load('./configs/datasets.yaml')
-dataset1 = HICODataset(**DConf.Train.HICO.Train)
-dataset2 = HICOTestDataset(**DConf.Train.HICO.Test)
-dataset3 = PSGDataset(**DConf.Train.PSG)
-dataset4 = BurstDataset(**DConf.Train.Burst.Train)
-dataset5 = BurstDataset(**DConf.Train.Burst.Val)
-dataset6 = BurstDataset(**DConf.Train.Burst.Test)
-dataset7 = LVVISDataset(**DConf.Train.LVVIS)
-dataset8 = OVISDataset(**DConf.Train.OVIS)
-dataset9 = PVSGDataset(**DConf.Train.PVSG)
-dataset10 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
-dataset11 = YoutubeVISDataset(**DConf.Train.YoutubeVIS)
-dataset12 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)
-tokenizer = dataset1.tokenizer
-image_data = [dataset1, dataset2, dataset3]
-video_data = [dataset9, dataset10, dataset11, dataset12]
+# dataset1 = HICODataset(**DConf.Train.HICO.Train)
+# dataset2 = HICOTestDataset(**DConf.Train.HICO.Test)
+# dataset3 = PSGDataset(**DConf.Train.PSG)
+# dataset4 = BurstDataset(**DConf.Train.Burst.Train)
+# dataset5 = BurstDataset(**DConf.Train.Burst.Val)
+# dataset6 = BurstDataset(**DConf.Train.Burst.Test)
+# dataset7 = LVVISDataset(**DConf.Train.LVVIS)
+# dataset8 = OVISDataset(**DConf.Train.OVIS)
+# dataset9 = PVSGDataset(**DConf.Train.PVSG)
+# dataset10 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
+# dataset11 = YoutubeVISDataset(**DConf.Train.YoutubeVIS)
+# dataset12 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)
+dataset13 = OpenImagesDataset(**DConf.Train.OpenImages)
+# image_data = [dataset1, dataset2, dataset3]
+# video_data = [dataset9, dataset10, dataset11, dataset12]
 
 # The ratio of each dataset is adjusted by setting the __len__ 
 # dataset = ConcatDataset(image_data + video_data)
-dataset = dataset4
+dataset = dataset13
+tokenizer = dataset.tokenizer
 dataloader = DataLoader(dataset, num_workers=8, batch_size=1, shuffle=True)
 
 def find_save_path(is_mask):

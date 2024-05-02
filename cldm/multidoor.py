@@ -1,14 +1,11 @@
 from ldm.models.diffusion.ddpm import LatentDiffusion
 from ldm.util import instantiate_from_config
-from cldm.utils import add_unet_crossattn_map_store, fuse_object_embeddings, get_object_localization_loss
+from cldm.utils import fuse_object_embeddings
 
 from typing import Optional, Tuple, Union
-import gc
 import torch
 from torch import nn
-import torch.nn.functional as F
-from einops import rearrange, repeat
-from torchvision.utils import make_grid
+from einops import rearrange
 from transformers import CLIPTextModel
 from transformers.modeling_outputs import BaseModelOutputWithPooling
 from transformers.models.clip.modeling_clip import (
@@ -293,4 +290,4 @@ class MultiDoor(LatentDiffusion):
         uncond_text = torch.tensor([self.pad_token_id] * num_samples).unsqueeze(1).repeat(1, 77).cuda()
         uncond_text = self.cond_stage_model(uncond_text).last_hidden_state
         uncond_image = torch.zeros(num_samples, 512, 1024).cuda()
-        return uncond_text, uncond_image   # (b, 77, 1024)
+        return uncond_text, uncond_image

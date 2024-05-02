@@ -342,19 +342,19 @@ def inference(ref_image, ref_mask, tar_image, tar_mask, ext, need_process, guida
     dino_input = torch.from_numpy(ref).float().cuda() 
     dino_input = torch.stack([dino_input for _ in range(num_samples)], dim=0)
     dino_input = dino_input.clone()
-    image_token = model.image_encoder(dino_input) # (b, n, 1, 1536)
+    patch_tokens, cls_token = model.image_encoder(dino_input)
     clip_input = input_ids.unsqueeze(0)
     text_token = model.get_learned_conditioning(clip_input.cuda()).last_hidden_state # (b, 77, 1024)
     num_objects = torch.tensor([[2]]).cuda()
     context = model.fuser(
         text_token,
-        image_token,
+        cls_token,
         image_token_masks,
         num_objects,
     )
-    uncond = model.get_unconditional_conditioning(num_samples) # (b, 77, 1024)
-    cond = {"c_concat": control, "c_crossattn": context}
-    un_cond = {"c_concat": None if guess_mode else control, "c_crossattn": uncond}
+    uncond_text, uncond_image = model.get_unconditional_conditioning(num_samples) # (b, 77, 1024)
+    cond = {"c_concat": control, "c_crossattn": context, "c_ip": patch_tokens}
+    un_cond = {"c_concat": control, "c_crossattn": uncond_text, "c_ip": uncond_image}
 
     if save_memory:
         model.low_vram_shift(is_diffusing=True)
@@ -484,19 +484,4 @@ if __name__ == '__main__':
             vis_image = cv2.hconcat([ref_image, back_image, hint, gen_image])
           
         start_index += 1
-        # cv2.imwrite(save_path, vis_image[:, :, ::-1])
         cv2.imwrite(save_path, gen_image[:, :, ::-1])
-        
-        # cross_attn_map = ddim_sampler.model.cross_attn_map_store['output_blocks.8.1.transformer_blocks.0.attn2']
-        # cross_attn_map = cross_attn_map.mean((0, 1))
-        # image_token_masks = ext["image_token_masks"]
-        # cross_attn_map = cross_attn_map[:, image_token_masks]
-        # res = int(math.sqrt(cross_attn_map.shape[0]))
-        # cross_attn_map = cross_attn_map.reshape(res, res, -1)
-        # ref1, ref2 = torch.chunk(cross_attn_map, 2, dim=-1)
-        # ref1 = ref1.squeeze(-1).cpu().numpy()
-        # ref2 = ref2.squeeze(-1).cpu().numpy()
-        # ref1 = (ref1 - ref1.min()) / (ref1.max() - ref1.min())
-        # ref2 = (ref2 - ref2.min()) / (ref2.max() - ref2.min())
-        # cv2.imwrite("camap1.jpg", ref1 * 255)
-        # cv2.imwrite("camap2.jpg", ref2 * 255)
