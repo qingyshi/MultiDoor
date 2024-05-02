@@ -5,6 +5,7 @@ from datasets.lvvis import LVVISDataset
 from datasets.ovis import OVISDataset
 from datasets.psg import PSGDataset
 from datasets.pvsg import PVSGDataset
+from datasets.openimages import OpenImagesDataset
 from datasets.vipseg import VIPSegDataset
 from datasets.ytb_vis import YoutubeVIS21Dataset, YoutubeVISDataset
 from datasets.ytb_vos import YoutubeVOSDataset
@@ -21,7 +22,7 @@ if save_memory:
     enable_sliced_attention()
 
 # Configs
-resume_path = 'checkpoints/control_sd21_ini.ckpt'
+resume_path = 'lightning_logs/version_8/checkpoints/epoch=9-step=68749.ckpt'
 batch_size = 4
 logger_freq = 2000
 learning_rate = 1e-5
@@ -43,24 +44,25 @@ DConf = OmegaConf.load('./configs/datasets.yaml')
 dataset1 = HICODataset(**DConf.Train.HICO.Train)
 dataset2 = HICOTestDataset(**DConf.Train.HICO.Test)
 dataset3 = PSGDataset(**DConf.Train.PSG)
-# dataset4 = BurstDataset(**DConf.Train.Burst.Train)
-# dataset5 = BurstDataset(**DConf.Train.Burst.Val)
-# dataset6 = BurstDataset(**DConf.Train.Burst.Test)
+dataset4 = OpenImagesDataset(**DConf.Train.OpenImages)
+dataset5 = BurstDataset(**DConf.Train.Burst.Train)
+dataset6 = BurstDataset(**DConf.Train.Burst.Val)
+dataset7 = BurstDataset(**DConf.Train.Burst.Test)
 # dataset7 = LVVISDataset(**DConf.Train.LVVIS)
-# dataset8 = OVISDataset(**DConf.Train.OVIS)
+dataset8 = OVISDataset(**DConf.Train.OVIS)
 dataset9 = PVSGDataset(**DConf.Train.PVSG)
-# dataset10 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
-# dataset11 = YoutubeVISDataset(**DConf.Train.YoutubeVIS)
-# dataset12 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)
+dataset10 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
+dataset11 = YoutubeVISDataset(**DConf.Train.YoutubeVIS)
+dataset12 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)
 # dataset13 = VIPSegDataset(**DConf.Train.VIPSeg)
 
-image_data = [dataset1, dataset2, dataset3]
-video_data = [dataset9]
+image_data = [dataset1, dataset2, dataset3, dataset4]
+video_data = [dataset5, dataset6, dataset7, dataset8, dataset9, dataset10, dataset11, dataset12]
 
 # The ratio of each dataset is adjusted by setting the __len__ 
 dataset = ConcatDataset(image_data + video_data)
 dataloader = DataLoader(dataset, num_workers=8, batch_size=batch_size, shuffle=True)
-logger = ImageLogger(batch_frequency=logger_freq, split="v3")
+logger = ImageLogger(batch_frequency=logger_freq, split="v3_")
 trainer = pl.Trainer(
     gpus=gpus,
     strategy="ddp",

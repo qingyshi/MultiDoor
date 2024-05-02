@@ -17,7 +17,7 @@ from PIL import Image
 import os
 import shutil
 from transformers import CLIPTokenizer
-import math
+
 
 save_memory = False
 disable_verbosity()
@@ -336,7 +336,6 @@ def inference(ref_image, ref_mask, tar_image, tar_mask, ext, need_process, guida
     control = torch.from_numpy(hint.copy()).float().cuda() 
     control = torch.stack([control for _ in range(num_samples)], dim=0)
     control = einops.rearrange(control, 'b h w c -> b c h w').clone()
-    control = encode_inpainting(model, control) # (b, 5, 64, 64)
 
     # dino_input.shape: (n, 224, 224, 3)
     dino_input = torch.from_numpy(ref).float().cuda() 
@@ -402,15 +401,15 @@ if __name__ == '__main__':
     # bg_image_path = 'examples/background/03/00.png'
     # bg_mask_path = [bg_image_path.replace("00.png", "mask_0.png"), bg_image_path.replace("00.png", "mask_1.png")]
     # need_process = True
-    reference_image_path = ['examples/cocovalv2/dog_dog/22/ref1.jpg', 'examples/cocovalv2/bench_cat/1/ref2.jpg']
+    reference_image_path = ['examples/cocoval/cat_dog/1/ref1.jpg', 'examples/cocoval/surfboard_chair/0/ref1.jpg']
     reference_bg_path = [os.path.join(os.path.dirname(image_path), "bg.jpg") for image_path in reference_image_path]
     bg_id = 11
-    bg_image_path = f'examples/cocovalv2/dog_dog/3/bg.jpg'
+    bg_image_path = f'examples/cocoval/person_surfboard/78/bg.jpg'
     bg_mask_path = [bg_image_path.replace("bg.jpg", "0.png"), bg_image_path.replace("bg.jpg", "1.png")]
     need_process = False
     
-    caption = "The dog is fighting with the cat."
-    nouns = ["dog", "cat"]
+    caption = "The cat is surfing the surfboard."
+    nouns = ["cat", "surfboard"]
     class_name = "_".join(nouns)
     start = 1
        

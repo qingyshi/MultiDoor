@@ -29,7 +29,7 @@ class YoutubeVISDataset(BaseDataset):
         self.data = video_dirs
         self.size = (512,512)
         self.clip_size = (224,224)
-        self.dynamic = 2
+        self.dynamic = 1
 
     def __len__(self):
         return 2000
@@ -114,7 +114,7 @@ class YoutubeVIS21Dataset(BaseDataset):
         self.id2cat = {obj['id']: obj['name'] for obj in categories}
         self.size = (512,512)
         self.clip_size = (224,224)
-        self.dynamic = 2
+        self.dynamic = 1
 
     def __len__(self):
         return 2000

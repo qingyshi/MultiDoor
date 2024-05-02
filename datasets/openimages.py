@@ -28,16 +28,10 @@ class OpenImagesDataset(BaseDataset):
             else:
                 name = " ".join(idname[1:])[:-1]
                 self.id2name[id] = name
-        self.dynamic = 1
+        self.dynamic = 0
     
     def __len__(self):
         return len(self.data)
-    
-    def sample_timestep(self, max_step=1000):
-        step_start = 0
-        step_end = max_step
-        step = np.random.randint(step_start, step_end)
-        return np.array([step])
 
     def get_sample(self, index):
         anno = self.data[index].split(",")[:-1]
