@@ -338,7 +338,7 @@ class BasicTransformerBlock(nn.Module):
                               heads=n_heads, dim_head=d_head, dropout=dropout)  # is self-attn if context is none
         self.adapter = attn_cls(query_dim=dim, context_dim=context_dim,
                                 heads=n_heads, dim_head=d_head, dropout=dropout)  # is self-attn if context is none
-        self.gamma = nn.Parameter(torch.tensor([0.0]))
+        self.gamma = nn.Parameter(torch.tensor([1.0]))
 
         self.norm1 = nn.LayerNorm(dim)
         self.norm2 = nn.LayerNorm(dim)
