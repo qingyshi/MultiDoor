@@ -293,15 +293,10 @@ class FrozenMultiDoorEncoder(AbstractEncoder):
             self.freeze()
         self.image_mean = torch.tensor([0.485, 0.456, 0.406]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
         self.image_std =  torch.tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
-        # self.project = nn.Linear(
-        #     in_features=1536,
-        #     out_features=1024
-        # )
-        # self.objects_token = nn.Parameter(torch.randn((2, 1536)), requires_grad=True)
 
     def freeze(self):
         self.model.eval()
-        for param in self.model.paramters():
+        for param in self.model.parameters():
             param.requires_grad_(False)
 
     def forward(self, image):
@@ -320,7 +315,6 @@ class FrozenMultiDoorEncoder(AbstractEncoder):
         features = self.model.forward_features(image)
         clstoken  = features["x_norm_clstoken"]
         clstoken = clstoken.reshape(b, n, 1, -1)
-        # clstoken = clstoken + self.objects_token.data.reshape(1, n, 1, -1)
         image_features = clstoken
         return image_features
 
