@@ -30,7 +30,7 @@ sd_locked = False
 only_mid_control = False
 gpus = 4
 accumulate_grad_batches = 2
-max_epochs = 24
+max_epochs = 16
 
 # First use cpu to load models. Pytorch Lightning will automatically move it to GPUs.
 model = create_model('./configs/multidoor.yaml').cpu()

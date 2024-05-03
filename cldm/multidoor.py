@@ -270,8 +270,8 @@ class MultiDoor(LatentDiffusion):
         log["conditioning"] = torch.permute(cond_image, (0, 3, 1, 2)) * 2.0 - 1.0  
         
         if unconditional_guidance_scale > 1.0:
-            uc_text, uc_image = self.get_unconditional_conditioning(N)
-            uc_full = {"c_concat": c_cat, "c_crossattn": uc_text, "c_ip": uc_image}
+            uc_image = self.get_unconditional_conditioning(N)
+            uc_full = {"c_concat": c_cat, "c_crossattn": context, "c_ip": uc_image}
             samples_cfg, _ = self.sample_log(cond={"c_concat": c_cat, 
                                                    "c_crossattn": context,
                                                    "c_ip": ip},
@@ -287,7 +287,5 @@ class MultiDoor(LatentDiffusion):
     
     @torch.no_grad()
     def get_unconditional_conditioning(self, num_samples):
-        uncond_text = torch.tensor([self.pad_token_id] * num_samples).unsqueeze(1).repeat(1, 77).cuda()
-        uncond_text = self.cond_stage_model(uncond_text).last_hidden_state
-        uncond_image = torch.zeros(num_samples, 512, 1024).cuda()
-        return uncond_text, uncond_image
+        uncond_image = torch.zeros(num_samples, 514, 1024).cuda()
+        return uncond_image

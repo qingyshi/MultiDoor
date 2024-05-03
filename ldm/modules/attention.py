@@ -349,8 +349,9 @@ class BasicTransformerBlock(nn.Module):
     def forward(self, x, context=None, ip=None):
         x = self.attn1(self.norm1(x), context=context if self.disable_self_attn else None) + x
         if ip is not None:
-            x = self.gamma * self.adapter(self.norm_adapter(x), context=ip) + x
-        x = self.attn2(self.norm2(x), context=context) + x
+            x = self.gamma * self.adapter(self.norm_adapter(x), context=ip) + self.attn2(self.norm2(x), context=context) + x
+        else:
+            x = self.attn2(self.norm2(x), context=context) + x
         x = self.ff(self.norm3(x)) + x
         return x
 
