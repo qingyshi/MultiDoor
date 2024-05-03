@@ -221,10 +221,10 @@ def inference_single_image(ref_image, ref_mask, tar_image, tar_mask, guidance_sc
 
 def run_and_save(reference_image_path=None, bg_image_path=None, save_path=None):
     # ==== Example for inferring a single image ===
-    reference_image_path = 'examples/cocovalv2/person_surfboard/68/ref2.jpg'
-    reference_mask_path = 'examples/cocovalv2/cat_dog/0/0.png'
-    bg_image_path = 'test.jpg'
-    bg_mask_path = 'examples/cocovalv2/person_surfboard/20/1.png'
+    reference_image_path = 'examples/cocoval/cat_cat/10/ref2.jpg'
+    reference_mask_path = 'examples/cocoval/cat_dog/10/0.png'
+    bg_image_path = 'examples/cocoval/person_surfboard/0/bg.jpg'
+    bg_mask_path = 'examples/cocoval/person_surfboard/0/0.png'
     save_path = 'test2.jpg'
 
     # reference image + reference mask
