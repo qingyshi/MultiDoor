@@ -1,0 +1,11 @@
+cat:
+    examples/cocoval/banana_cat/0/ref2.jpg
+    examples/cocoval/bench_cat/1/ref2.jpg
+    examples/cocoval/book_cat/1/ref2.jpg
+    examples/cocoval/car_cat/0/ref2.jpg
+    examples/cocoval/cat_bed/6/ref1.jpg
+    examples/cocoval/cat_bench/3/ref1.jpg
+    examples/cocoval/keyboard_cat/2/ref2.jpg
+    examples/cocoval/keyboard_cat/4/ref2.jpg
+    examples/cocoval/cat_cat/0/ref1.jpg
+    examples/cocoval/cat_cat/10/ref2.jpg

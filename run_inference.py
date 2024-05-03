@@ -52,7 +52,10 @@ def process_nouns_format(nouns, caption):
         caption = caption[0]
     _nouns = []
     for noun in nouns:
-        start = caption.index(noun)
+        if len(_nouns) >= 1:
+            start = caption.index(noun, _nouns[0]["end"])
+        else:
+            start = caption.index(noun)
         end = start + len(noun)
         noun = dict(
             word = noun,
@@ -401,15 +404,15 @@ if __name__ == '__main__':
     # bg_image_path = 'examples/background/03/00.png'
     # bg_mask_path = [bg_image_path.replace("00.png", "mask_0.png"), bg_image_path.replace("00.png", "mask_1.png")]
     # need_process = True
-    reference_image_path = ['examples/cocoval/cat_dog/1/ref1.jpg', 'examples/cocoval/surfboard_chair/0/ref1.jpg']
+    reference_image_path = ['examples/cocoval/cat_dog/1/ref1.jpg', 'examples/cocoval/cat_cat/10/ref2.jpg']
     reference_bg_path = [os.path.join(os.path.dirname(image_path), "bg.jpg") for image_path in reference_image_path]
     bg_id = 11
-    bg_image_path = f'examples/cocoval/person_surfboard/78/bg.jpg'
+    bg_image_path = f'examples/cocoval/dog_dog/0/bg.jpg'
     bg_mask_path = [bg_image_path.replace("bg.jpg", "0.png"), bg_image_path.replace("bg.jpg", "1.png")]
     need_process = False
     
-    caption = "The cat is surfing the surfboard."
-    nouns = ["cat", "surfboard"]
+    caption = "The cat is chasing the cat."
+    nouns = ["cat", "cat"]
     class_name = "_".join(nouns)
     start = 1
        
