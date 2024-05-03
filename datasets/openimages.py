@@ -31,7 +31,7 @@ class OpenImagesDataset(BaseDataset):
         self.dynamic = 0
     
     def __len__(self):
-        return len(self.data)
+        return 20000
 
     def get_sample(self, index):
         anno = self.data[index].split(",")[:-1]
