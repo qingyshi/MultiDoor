@@ -49,7 +49,7 @@ class BaseDataset(Dataset):
             A.HorizontalFlip(p=0.5),
             A.RandomBrightnessContrast(p=0.5),
             A.Rotate(limit=20, border_mode=cv2.BORDER_CONSTANT, value=(0,0,0)),
-            ])
+        ])
 
         transformed = transform(image=image.astype(np.uint8), mask=mask)
         transformed_image = transformed["image"]
@@ -73,7 +73,7 @@ class BaseDataset(Dataset):
     def __getitem__(self, idx):
         while(True):
             try:
-                idx = np.random.randint(0, len(self.data)-1)
+                # idx = np.random.randint(0, len(self.data)-1)
                 item = self.get_sample(idx)
                 return item
             except:

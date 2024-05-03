@@ -26,12 +26,6 @@ class HICODataset(BaseDataset):
     
     def __len__(self):
         return 40000
-    
-    def sample_timestep(self, max_step=1000):
-        step_start = 0
-        step_end = max_step
-        step = np.random.randint(step_start, step_end)
-        return np.array([step])
 
     def get_sample(self, index):
         filename = self.data[index]
@@ -95,12 +89,6 @@ class HICOTestDataset(BaseDataset):
     
     def __len__(self):
         return 10000
-    
-    def sample_timestep(self, max_step=1000):
-        step_start = 0
-        step_end = max_step
-        step = np.random.randint(step_start, step_end)
-        return np.array([step])
 
     def get_sample(self, index):
         filename = self.data[index]
