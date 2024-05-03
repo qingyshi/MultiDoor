@@ -402,14 +402,14 @@ if __name__ == '__main__':
     # bg_image_path = 'examples/background/03/00.png'
     # bg_mask_path = [bg_image_path.replace("00.png", "mask_0.png"), bg_image_path.replace("00.png", "mask_1.png")]
     # need_process = True
-    reference_image_path = ['examples/cocoval/cat_cat/10/ref2.jpg', 'examples/cocoval/surfboard_chair/0/ref1.jpg']
+    reference_image_path = ['examples/cocoval/cat_cat/2/ref2.jpg', 'examples/cocoval/surfboard_chair/0/ref1.jpg']
     reference_bg_path = [os.path.join(os.path.dirname(image_path), "bg.jpg") for image_path in reference_image_path]
     bg_id = 11
-    bg_image_path = f'examples/cocoval/person_surfboard/78/bg.jpg'
+    bg_image_path = f'examples/cocoval/person_surfboard/0/bg.jpg'
     bg_mask_path = [bg_image_path.replace("bg.jpg", "0.png"), bg_image_path.replace("bg.jpg", "1.png")]
     need_process = False
     
-    caption = "The cat is sitting on the surfboard."
+    caption = "The cat is surfing the surfboard."
     nouns = ["cat", "surfboard"]
     class_name = "_".join(nouns)
     start = 1
@@ -469,7 +469,7 @@ if __name__ == '__main__':
         # background mask 
         tar_mask = [np.array(Image.open(file).convert('L')) == 255 for file in bg_mask_path]
         
-        gen_image, hint = inference(ref_image, ref_mask, back_image, tar_mask, ext, need_process=need_process, guidance_scale=7.5)
+        gen_image, hint = inference(ref_image, ref_mask, back_image, tar_mask, ext, need_process=need_process, guidance_scale=9.0)
         
         h, w = back_image.shape[0], back_image.shape[1]
         hint = cv2.resize(hint, (w, h))
