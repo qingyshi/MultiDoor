@@ -32,7 +32,7 @@ class YoutubeVISDataset(BaseDataset):
         self.dynamic = 2
 
     def __len__(self):
-        return 2000
+        return 20000
 
     def check_region_size(self, image, yyxx, ratio, mode = 'max'):
         pass_flag = True

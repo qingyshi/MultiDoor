@@ -35,12 +35,15 @@ scratch_dict = model.state_dict()
 
 target_dict = {}
 for k in scratch_dict.keys():
-    if "input_blocks.0" in k:
-        print(f"skip weights: {k}")
+    is_control, name = get_node_name(k, 'control_')     # name: "model.xxxx"
+    if 'control_model.input_blocks.0.0' in k:
+        print('skipped key: ', k)
         continue
+
+    if is_control:
+        copy_k = 'model.diffusion_' + name
     else:
         copy_k = k
-      
     if copy_k in pretrained_weights:
         target_dict[k] = pretrained_weights[copy_k].clone()
     else:

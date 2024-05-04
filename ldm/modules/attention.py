@@ -328,7 +328,6 @@ class BasicTransformerBlock(nn.Module):
                  disable_self_attn=False):
         super().__init__()
         attn_mode = "softmax-xformers" if XFORMERS_IS_AVAILBLE else "softmax"
-        attn_mode = "softmax"
         assert attn_mode in self.ATTENTION_MODES
         attn_cls = self.ATTENTION_MODES[attn_mode]
         self.disable_self_attn = disable_self_attn

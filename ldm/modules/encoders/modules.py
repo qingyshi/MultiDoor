@@ -293,22 +293,20 @@ class FrozenMultiDoorEncoder(AbstractEncoder):
             self.freeze()
         self.image_mean = torch.tensor([0.485, 0.456, 0.406]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
         self.image_std =  torch.tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
-        self.objects_token = nn.Parameter(torch.randn((2, 1536)), requires_grad=True)
-
+        self.projecter = nn.Linear(1536, 1024)
+        
     def freeze(self):
-        self.model.patch_embed.eval()
-        for i, block in enumerate(self.model.blocks):
-            if i < len(self.model.blocks) - 2:
-                block.eval()
-                for param in block.parameters():
-                    param.requires_grad = False
+        self.model.eval()
+        for param in self.model.parameters():
+            param.requires_grad = False
 
     def forward(self, image):
         """
         Input:
             image: multiple reference objects from single image in shape (b, n, h, w, c)
         Output:
-            image_features: reference tokens in shape (b, n, 1, 1536)
+            ip_tokens: (b, n * 256, 1024)
+            image_features: reference tokens in shape (b, n, 1, 1024)
         """
         
         if len(image.shape) == 5:
@@ -319,11 +317,9 @@ class FrozenMultiDoorEncoder(AbstractEncoder):
         features = self.model.forward_features(image)
         clstoken  = features["x_norm_clstoken"] # (b * n, 1536)
         patchtokens = features["x_norm_patchtokens"] # (b * n, 256, 1536)
-        tokens = patchtokens.mean(1) + clstoken
-        clstoken = tokens.reshape(b, n, 1, -1)
-        clstoken = clstoken + self.objects_token.data.reshape(1, n, 1, -1)
-        image_features = clstoken
-        return image_features
+        image_features = clstoken.reshape(b, n, 1, 1536)
+        ip_tokens = patchtokens.reshape(b, n, 256, 1536).flatten(1, 2)
+        return self.projecter(ip_tokens), self.projecter(image_features)
 
     def encode(self, image):
         return self(image)
