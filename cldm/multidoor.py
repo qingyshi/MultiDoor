@@ -297,7 +297,6 @@ class MultiDoor(LatentDiffusion):
         params = list(self.image_encoder.model.blocks[-2:].parameters())
         params += list(self.model.diffusion_model.parameters())
         params += list(self.fuser.parameters())
-        params.append(self.image_encoder.objects_token)
         opt = torch.optim.AdamW(params, lr=lr)
         return opt
     

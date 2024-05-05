@@ -21,7 +21,7 @@ if save_memory:
     enable_sliced_attention()
 
 # Configs
-resume_path = 'lightning_logs/version_6/checkpoints/epoch=4-step=81249.ckpt'
+resume_path = 'checkpoints/sd_ini.ckpt'
 batch_size = 2
 logger_freq = 2000
 learning_rate = 1e-5
@@ -41,21 +41,21 @@ model.only_mid_control = only_mid_control
 # datasets
 DConf = OmegaConf.load('./configs/datasets.yaml')
 dataset1 = HICODataset(**DConf.Train.HICO.Train)
-dataset2 = HICOTestDataset(**DConf.Train.HICO.Test)
+# dataset2 = HICOTestDataset(**DConf.Train.HICO.Test)
 dataset3 = PSGDataset(**DConf.Train.PSG)
-dataset4 = BurstDataset(**DConf.Train.Burst.Train)
-dataset5 = BurstDataset(**DConf.Train.Burst.Val)
+# dataset4 = BurstDataset(**DConf.Train.Burst.Train)
+# dataset5 = BurstDataset(**DConf.Train.Burst.Val)
 dataset6 = BurstDataset(**DConf.Train.Burst.Test)
-dataset7 = LVVISDataset(**DConf.Train.LVVIS)
-dataset8 = OVISDataset(**DConf.Train.OVIS)
+# dataset7 = LVVISDataset(**DConf.Train.LVVIS)
+# dataset8 = OVISDataset(**DConf.Train.OVIS)
 dataset9 = PVSGDataset(**DConf.Train.PVSG)
-dataset10 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
+# dataset10 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
 dataset11 = YoutubeVISDataset(**DConf.Train.YoutubeVIS)
-dataset12 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)
-dataset13 = VIPSegDataset(**DConf.Train.VIPSeg)
+# dataset12 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)
+# dataset13 = VIPSegDataset(**DConf.Train.VIPSeg)
 
-image_data = [dataset1, dataset2, dataset3]
-video_data = [dataset4, dataset5, dataset6, dataset7, dataset8, dataset9, dataset10, dataset11, dataset12, dataset13]
+image_data = [dataset1, dataset3]
+video_data = [dataset6, dataset9, dataset11]
 
 # The ratio of each dataset is adjusted by setting the __len__ 
 dataset = ConcatDataset(image_data + video_data)

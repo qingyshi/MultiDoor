@@ -36,11 +36,11 @@ scratch_dict = model.state_dict()
 target_dict = {}
 for k in scratch_dict.keys():
     if "input_blocks.0" in k:
-        print(f"skip weights: {k}")
+        print(f"skip weights: {k}.shape = {scratch_dict[k].shape}")
         continue
     else:
         copy_k = k
-      
+    
     if copy_k in pretrained_weights:
         target_dict[k] = pretrained_weights[copy_k].clone()
     else:

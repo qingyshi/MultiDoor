@@ -25,6 +25,7 @@ class BurstDataset(BaseDataset):
         # num_frames = burst_video.num_annotated_frames
         _track_category_ids = burst_video._track_category_ids
         # frame_indices = np.random.choice(num_frames, 2, replace=False).tolist()
+        frame_indices = np.random.randint(min(frame_indices), max(frame_indices), 2).tolist()
 
         images = burst_video.load_images(frame_indices)
         images_path = burst_video.get_image_paths(frame_indices)
@@ -45,7 +46,7 @@ class BurstDataset(BaseDataset):
         return item_with_collage
 
     def __len__(self):
-        return 4000
+        return 20000
     
     def load_caption(self, idx):
         if idx not in self.caption:

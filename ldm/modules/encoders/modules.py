@@ -295,9 +295,12 @@ class FrozenMultiDoorEncoder(AbstractEncoder):
         self.image_std =  torch.tensor([0.229, 0.224, 0.225]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
 
     def freeze(self):
-        self.model.eval()
-        for param in self.model.parameters():
-            param.requires_grad_(False)
+        self.model.patch_embed.eval()
+        for i, block in enumerate(self.model.blocks):
+            if i < len(self.model.blocks) - 2:
+                block.eval()
+                for param in block.parameters():
+                    param.requires_grad = False
 
     def forward(self, image):
         """
@@ -315,8 +318,7 @@ class FrozenMultiDoorEncoder(AbstractEncoder):
         features = self.model.forward_features(image)
         clstoken  = features["x_norm_clstoken"]
         clstoken = clstoken.reshape(b, n, 1, -1)
-        image_features = clstoken
-        return image_features
+        return clstoken
 
     def encode(self, image):
         return self(image)
