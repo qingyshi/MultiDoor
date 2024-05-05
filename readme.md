@@ -1,13 +1,13 @@
 <p align="center">
 
   <h2 align="center">MultiDoor</h2>
-  <p align="center">
+<!--   <p align="center">
     <a href="https://scholar.google.com.hk/citations?user=VpSqhJAAAAAJ&hl=zh-CN"><strong>Qingyu Shi</strong></a>
     ·
     <a href="https://scholar.google.com.hk/citations?user=SSI90d4AAAAJ&hl=zh-CN&oi=ao"><strong>Lu Qi</strong></a>
     <br>
     <b>Peking University &nbsp; | &nbsp;  UC Merced  | &nbsp; Skywork AI </b>
-  </p>
+  </p> -->
   
   <!-- <table align="center">
     <tr>
