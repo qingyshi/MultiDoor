@@ -53,8 +53,10 @@ class PVSGDataset(BaseDataset):
 
         if '-' in video_id:
             dir_name = 'ego4d'
+            raise ValueError
         elif 'P' in video_id:
             dir_name = 'epic_kitchen'
+            raise ValueError
         else:
             dir_name = 'vidor' 
         video_dir = os.path.join(self.data_root, dir_name, 'frames', video_id)

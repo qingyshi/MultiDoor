@@ -21,19 +21,18 @@ if save_memory:
     enable_sliced_attention()
 
 # Configs
-resume_path = 'checkpoints/sd_ini.ckpt'
+resume_path = '/data00/sqy/checkpoints/anydoor/v1/epoch=9-step=99999.ckpt'
 batch_size = 2
 logger_freq = 2000
 learning_rate = 1e-5
 sd_locked = False
 only_mid_control = False
-n_gpus = 4
+n_gpus = 1
 accumulate_grad_batches = 2
-max_epochs = 12
+max_epochs = 16
 
 # First use cpu to load models. Pytorch Lightning will automatically move it to GPUs.
 model = create_model('./configs/multidoor.yaml').cpu()
-model.load_state_dict(load_state_dict(resume_path, location='cpu'), strict=False)
 model.learning_rate = learning_rate
 model.sd_locked = sd_locked
 model.only_mid_control = only_mid_control
@@ -60,7 +59,7 @@ video_data = [dataset6, dataset9, dataset11]
 # The ratio of each dataset is adjusted by setting the __len__ 
 dataset = ConcatDataset(image_data + video_data)
 dataloader = DataLoader(dataset, num_workers=8, batch_size=batch_size, shuffle=True)
-logger = ImageLogger(batch_frequency=logger_freq, split="less_video")
+logger = ImageLogger(batch_frequency=logger_freq, split="v1")
 trainer = pl.Trainer(
     gpus=n_gpus,
     strategy="ddp",
@@ -69,7 +68,8 @@ trainer = pl.Trainer(
     callbacks=[logger],
     progress_bar_refresh_rate=1,
     accumulate_grad_batches=accumulate_grad_batches,
-    max_epochs=max_epochs
+    max_epochs=max_epochs,
+    resume_from_checkpoint=resume_path,
 )
 
 # Train!
