@@ -57,9 +57,10 @@ class HICODataset(BaseDataset):
         
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()
+        if np.random.rand() < 0.1:
+            caption = ""
         
         item_with_collage['time_steps'] = sampled_time_steps
-        # item_with_collage['image_path'] = image_path
         item_with_collage['caption'] = caption
         return item_with_collage
 
@@ -115,8 +116,9 @@ class HICOTestDataset(BaseDataset):
         
         item_with_collage = self.process_pairs(ref_image, ref_mask, tar_image, tar_mask)
         sampled_time_steps = self.sample_timestep()
+        if np.random.rand() < 0.1:
+            caption = ""
         
         item_with_collage['time_steps'] = sampled_time_steps
-        # item_with_collage['image_path'] = image_path
         item_with_collage['caption'] = caption
         return item_with_collage

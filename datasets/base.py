@@ -11,9 +11,9 @@ cv2.ocl.setUseOpenCL(False)
 import albumentations as A
 
 
+MAX_NUM_OBJECTS = 2
 class BaseDataset(Dataset):
     def __init__(self):
-        image_mask_dict = {}
         self.data = []
 
     def __len__(self):
@@ -231,7 +231,12 @@ class BaseDataset(Dataset):
         tar_masks = [cv2.resize(single_mask.astype(np.uint8), (512, 512), interpolation = cv2.INTER_NEAREST).astype(np.float32) 
                         for single_mask in tar_masks]
         collage_mask[collage_mask == 2] = -1
-        
+
+        if len(masked_ref_image_aug) < 2:
+            n, h, w, c = masked_ref_image_aug.shape
+            ref_padding = np.zeros((2 - n, h, w, c))
+            masked_ref_image_aug = np.concatenate([masked_ref_image_aug, ref_padding], axis=0)
+ 
         # Prepairing dataloader items
         masked_ref_image_aug = masked_ref_image_aug / 255 
         cropped_target_image = cropped_target_image / 127.5 - 1.0
@@ -239,11 +244,11 @@ class BaseDataset(Dataset):
         collage = np.concatenate([collage, collage_mask[:, :, :1]], -1)
         
         item = dict(
-                ref=masked_ref_image_aug.copy(), 
-                jpg=cropped_target_image.copy(), 
-                hint=collage.copy(), 
-                extra_sizes=np.array([H1, W1, H2, W2]), 
-                tar_box_yyxx_crop=np.array(tar_box_yyxx_crop),
-                tar_masks=tar_masks
-                ) 
+            ref=masked_ref_image_aug.copy(), 
+            jpg=cropped_target_image.copy(), 
+            hint=collage.copy(), 
+            extra_sizes=np.array([H1, W1, H2, W2]), 
+            tar_box_yyxx_crop=np.array(tar_box_yyxx_crop),
+            tar_masks=tar_masks
+        ) 
         return item

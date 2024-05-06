@@ -20,8 +20,8 @@ if save_memory:
     enable_sliced_attention()
 
 # Configs
-resume_path = 'checkpoints/sd_ini.ckpt'
-batch_size = 8
+resume_path = 'checkpoints/control_sd21_ini.ckpt'
+batch_size = 4
 logger_freq = 2000
 learning_rate = 1e-5
 sd_locked = False
@@ -42,21 +42,15 @@ DConf = OmegaConf.load('./configs/datasets.yaml')
 dataset1 = HICODataset(**DConf.Train.HICO.Train)
 dataset2 = HICOTestDataset(**DConf.Train.HICO.Test)
 dataset3 = PSGDataset(**DConf.Train.PSG)
-# dataset3 = CocoDataset(**DConf.Train.COCO)
-# dataset4 = SAMDataset(**DConf.Train.SAM)
 dataset4 = PVSGDataset(**DConf.Train.PVSG)
-# dataset6 = YoutubeVIS21Dataset(**DConf.Train.YoutubeVIS21)
-# dataset7 = YoutubeVISDataset(**DConf.Train.YoutubeVIS)
-# dataset8 = YoutubeVOSDataset(**DConf.Train.YoutubeVOS)
-# dataset9 = VIPSegDataset(**DConf.Train.VIPSeg)
 
 image_data = [dataset1, dataset2, dataset3]
 video_data = [dataset4]
 
 # The ratio of each dataset is adjusted by setting the __len__ 
-dataset = ConcatDataset(image_data + video_data)
+dataset = ConcatDataset(image_data + video_data + video_data)
 dataloader = DataLoader(dataset, num_workers=8, batch_size=batch_size, shuffle=True)
-logger = ImageLogger(batch_frequency=logger_freq, split="ipadapter")
+logger = ImageLogger(batch_frequency=logger_freq, split="v4")
 trainer = pl.Trainer(
     gpus=n_gpus,
     strategy="ddp",

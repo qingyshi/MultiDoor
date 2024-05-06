@@ -13,7 +13,7 @@ class TokenSelection(object):
             tokens: (b, n, k, 1536)
         '''
         b, n, l, c = tokens.shape
-        norm_tokens = tokens / ((tokens ** 2).sum(-1, keepdim=True) ** 0.5)
+        norm_tokens = tokens / ((tokens ** 2).sum(-1, keepdim=True) ** 0.5 + 1e-6)
         sim = torch.einsum("bnlc, bnmc -> bnlm", norm_tokens, norm_tokens.clone())
         sim = sim.softmax(-1)
         scores = sim.sum(-1)    # (b, n, 256)
@@ -24,6 +24,7 @@ class TokenSelection(object):
         return tokens
 
 if __name__ == "__main__":
-    tokens = torch.randn(4, 2, 256, 1536)
+    tokens = torch.cat([torch.ones(4, 2, 244, 1536), torch.zeros(4, 2, 12, 1536) + 1e-6], dim=2)
     ts = TokenSelection(24)
+    print(ts(tokens).sum())
     print(ts(tokens).shape)       

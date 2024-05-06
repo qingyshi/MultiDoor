@@ -270,7 +270,7 @@ class IPAdapter(nn.Module):
         
         self.to_k_ip = nn.Linear(context_dim, inner_dim, bias=False)
         self.to_v_ip = nn.Linear(context_dim, inner_dim, bias=False)
-        self.ip_scale = 1
+        self.ip_scale = nn.Parameter(torch.tensor([0.0]))
 
     def forward(self, x, context=None, subject=None, mask=None):
         h = self.heads
@@ -326,7 +326,7 @@ class BasicTransformerBlock(nn.Module):
         "softmax-xformers": MemoryEfficientCrossAttention
     }
     def __init__(self, dim, n_heads, d_head, dropout=0., context_dim=None, gated_ff=True, checkpoint=True,
-                 disable_self_attn=False):
+                 disable_self_attn=False, is_controlnet=False):
         super().__init__()
         attn_mode = "softmax-xformers" if XFORMERS_IS_AVAILBLE else "softmax"
         assert attn_mode in self.ATTENTION_MODES
@@ -337,22 +337,29 @@ class BasicTransformerBlock(nn.Module):
             context_dim=context_dim if self.disable_self_attn else None
         )  # is a self-attention if not self.disable_self_attn
         self.ff = FeedForward(dim, dropout=dropout, glu=gated_ff)
-        self.attn2 = IPAdapter(
-            query_dim=dim, context_dim=context_dim,
-            heads=n_heads, dim_head=d_head, dropout=dropout
-        )  # is self-attn if context is none
+        if not is_controlnet:
+            self.attn2 = IPAdapter(
+                query_dim=dim, context_dim=context_dim,
+                heads=n_heads, dim_head=d_head, dropout=dropout
+            )  # is self-attn if context is none
+        else:
+            self.attn2 = attn_cls(
+                query_dim=dim, context_dim=context_dim,
+                heads=n_heads, dim_head=d_head, dropout=dropout,
+            )  # is a self-attention if not self.disable_self_attn
 
         self.norm1 = nn.LayerNorm(dim)
         self.norm2 = nn.LayerNorm(dim)
         self.norm3 = nn.LayerNorm(dim)
         self.checkpoint = checkpoint
-
-    def forward(self, x, caption=None, subject=None):
-        return checkpoint(self._forward, (x, caption, subject), self.parameters(), self.checkpoint)
+        self.is_controlnet = is_controlnet
         
-    def _forward(self, x, caption=None, subject=None):
+    def forward(self, x, caption=None, subject=None):
         x = self.attn1(self.norm1(x), context=None) + x
-        x = self.attn2(self.norm2(x), context=caption, subject=subject) + x
+        if self.is_controlnet or subject is None:
+            x = self.attn2(self.norm2(x), context=caption) + x
+        else:
+            x = self.attn2(self.norm2(x), context=caption, subject=subject) + x
         x = self.ff(self.norm3(x)) + x
         return x
 
@@ -369,7 +376,7 @@ class SpatialTransformer(nn.Module):
     def __init__(self, in_channels, n_heads, d_head,
                  depth=1, dropout=0., context_dim=None,
                  disable_self_attn=False, use_linear=False,
-                 use_checkpoint=True):
+                 use_checkpoint=True, is_controlnet=False):
         super().__init__()
         if exists(context_dim) and not isinstance(context_dim, list):
             context_dim = [context_dim]
@@ -387,7 +394,7 @@ class SpatialTransformer(nn.Module):
 
         self.transformer_blocks = nn.ModuleList(
             [BasicTransformerBlock(inner_dim, n_heads, d_head, dropout=dropout, context_dim=context_dim[d],
-                                   disable_self_attn=disable_self_attn, checkpoint=use_checkpoint)
+                                   disable_self_attn=disable_self_attn, checkpoint=use_checkpoint, is_controlnet=is_controlnet)
                 for d in range(depth)]
         )
         if not use_linear:

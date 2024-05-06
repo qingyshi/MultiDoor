@@ -49,9 +49,10 @@ class PSGDataset(BaseDataset):
         item_with_collage = self.process_pairs(ref_image=img, ref_mask=masks, 
                                                tar_image=img.copy(), tar_mask=masks.copy())
         sampled_time_steps = self.sample_timestep()
+        if np.random.rand() < 0.1:
+            caption = ""
         
         item_with_collage['time_steps'] = sampled_time_steps
-        # item_with_collage['image_path'] = image_path
         item_with_collage['caption'] = caption
         return item_with_collage
     

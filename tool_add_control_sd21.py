@@ -7,7 +7,7 @@ input_path = sys.argv[1]
 output_path = sys.argv[2]
 
 assert os.path.exists(input_path), 'Input model does not exist.'
-assert not os.path.exists(output_path), 'Output filename already exists.'
+# assert not os.path.exists(output_path), 'Output filename already exists.'
 assert os.path.exists(os.path.dirname(output_path)), 'Output path is not valid.'
 
 import torch
@@ -32,29 +32,36 @@ pretrained_weights = torch.load(input_path)
 if 'state_dict' in pretrained_weights:
     pretrained_weights = pretrained_weights['state_dict']
 
+model.load_state_dict(torch.load(output_path))
 scratch_dict = model.state_dict()
 
 target_dict = {}
 for k in scratch_dict.keys():
-    if 'control_model.input_blocks.0.0' in k:
-        print('skipped key: ', k)
-        continue
     is_control, name = get_node_name(k, 'control_')     # name: "model.xxxx"
+    if is_control:
+        continue
+
+    if "attn2.to_q." in k:
+        target_dict[k] = pretrained_weights[k]
+    elif "attn2.to_k." in k:
+        target_dict[k] = pretrained_weights[k]
+    elif "attn2.to_v." in k:
+        target_dict[k] = pretrained_weights[k]
+    else:
+        target_dict[k] = scratch_dict[k]
     
-    if "fuser.attn1" in k:
-        copy_k = k.replace("fuser.attn1", "attn2")
-    elif "fuser.norm1" in k:
-        copy_k = k.replace("fuser.norm1", "norm2")
-    elif is_control:
-        copy_k = 'model.diffusion_' + name
-    else:
-        copy_k = k
+    # if "attn2.to_k_ip" in k:
+    #     copy_k = k.replace("attn2.to_k_ip", "attn2.to_k")
+    # elif "attn2.to_v_ip" in k:
+    #     copy_k = k.replace("attn2.to_v_ip", "attn2.to_v")
+    # else:
+    #     copy_k = k
         
-    if copy_k in pretrained_weights:
-        target_dict[k] = pretrained_weights[copy_k].clone()
-    else:
-        target_dict[k] = scratch_dict[k].clone()
-        print(f'These weights are newly added: {k}')
+    # if copy_k in pretrained_weights:
+    #     target_dict[k] = pretrained_weights[copy_k].clone()
+    # else:
+    #     target_dict[k] = scratch_dict[k].clone()
+    #     print(f'These weights are newly added: {k}')
 
 model.load_state_dict(target_dict, strict=False)
 torch.save(model.state_dict(), output_path)

@@ -48,7 +48,7 @@ class MultiControlledUnetModel(UNetModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-    def forward(self, x, timesteps=None, caption=None, subject=None, only_mid_control=False, **kwargs):
+    def forward(self, x, timesteps=None, caption=None, subject=None, control=None, only_mid_control=False, **kwargs):
         hs = []
         with torch.no_grad():
             t_emb = timestep_embedding(timesteps, self.model_channels, repeat_only=False)
@@ -59,12 +59,19 @@ class MultiControlledUnetModel(UNetModel):
                 hs.append(h)
             h = self.middle_block(h, emb, caption, subject)
 
+        if control is not None:
+            h += control.pop()
+
         for i, module in enumerate(self.output_blocks):
-            h = torch.cat([h, hs.pop()], dim=1)
+            if control is None:
+                h = torch.cat([h, hs.pop()], dim=1)
+            else:
+                h = torch.cat([h, hs.pop() + control.pop()], dim=1)
             h = module(h, emb, caption, subject)
 
         h = h.type(x.dtype)
         return self.out(h)
+
 
 class ControlNet(nn.Module):
     def __init__(
@@ -302,12 +309,12 @@ class ControlNet(nn.Module):
     def make_zero_conv(self, channels):
         return TimestepEmbedSequential(zero_module(conv_nd(self.dims, channels, channels, 1, padding=0)))
 
-    def forward(self, x, hint, timesteps, context, **kwargs):
+    def forward(self, x, hint, timesteps, caption, **kwargs):
         t_emb = timestep_embedding(timesteps, self.model_channels, repeat_only=False)
         emb = self.time_embed(t_emb) # 1, 1280
         
         # 1, 320, 64, 64
-        guided_hint = self.input_hint_block(hint, emb, context)
+        guided_hint = self.input_hint_block(hint, emb, caption)
         outs = []
 
         h = x.type(self.dtype)
@@ -317,12 +324,12 @@ class ControlNet(nn.Module):
                 h = guided_hint
                 guided_hint = None
             else:
-                h_new = module(h, emb, caption=context) 
+                h_new = module(h, emb, caption=caption) 
                 h =  h_new 
-            outs.append(zero_conv(h, emb, context))
+            outs.append(zero_conv(h, emb, caption))
 
-        h_new = self.middle_block(h, emb, caption=context)  
-        outs.append(self.middle_block_out(h_new, emb, context))        
+        h_new = self.middle_block(h, emb, caption=caption)  
+        outs.append(self.middle_block_out(h_new, emb, caption))        
         return outs
 
 

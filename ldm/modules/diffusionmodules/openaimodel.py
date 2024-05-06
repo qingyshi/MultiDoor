@@ -730,8 +730,8 @@ class UNetModel(nn.Module):
         )
         if self.predict_codebook_ids:
             self.id_predictor = nn.Sequential(
-            normalization(ch),
-            conv_nd(dims, model_channels, n_embed, 1),
+                normalization(ch),
+                conv_nd(dims, model_channels, n_embed, 1),
             #nn.LogSoftmax(dim=1)  # change to cross_entropy and produce non-normalized logits
         )
 

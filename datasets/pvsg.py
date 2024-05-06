@@ -22,7 +22,7 @@ class PVSGDataset(BaseDataset):
         self.dynamic = 2
 
     def __len__(self):
-        return 20000
+        return 40000
     
     def get_sample(self, index):
         data = self.data[index]
@@ -48,8 +48,10 @@ class PVSGDataset(BaseDataset):
 
         if '-' in video_id:
             dir_name = 'ego4d'
+            raise ValueError
         elif 'P' in video_id:
             dir_name = 'epic_kitchen'
+            raise ValueError
         else:
             dir_name = 'vidor' 
         video_dir = os.path.join(self.data_root, dir_name, 'frames', video_id)
@@ -71,9 +73,10 @@ class PVSGDataset(BaseDataset):
         item_with_collage = self.process_pairs(ref_image=ref_image, ref_mask=ref_mask, 
                                     tar_image=tar_image, tar_mask=tar_mask)
         sampled_time_steps = self.sample_timestep()
+        if np.random.rand() < 0.1:
+            caption = ""
         
         item_with_collage['time_steps'] = sampled_time_steps
-        # item_with_collage['image_path'] = tar_image_path
         item_with_collage['caption'] = caption
         return item_with_collage
         

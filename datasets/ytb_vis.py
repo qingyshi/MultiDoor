@@ -49,14 +49,7 @@ class YoutubeVISDataset(BaseDataset):
     
     def get_sample(self, idx):
         video_id = list(self.records.keys())[idx]
-        caption, chosen_objs = self.load_caption(video_id)
-        
-        # obj_list = list(self.records[video_id]["objects"].keys())
-        # if len(obj_list) >= 2:
-        #     chosen_objs = np.random.choice(obj_list, 2, replace=False)
-        # else:
-        #     raise Exception
-            
+        caption, chosen_objs = self.load_caption(video_id)         
         frames = [self.records[video_id]["objects"][str(single_id)]["frames"] for single_id in chosen_objs]
         names = [self.records[video_id]["objects"][str(single_id)]["category"] for single_id in chosen_objs]
         frames = np.intersect1d(*frames)
