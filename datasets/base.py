@@ -147,7 +147,7 @@ class BaseDataset(Dataset):
             ref_mask_3 = np.stack([single_mask, single_mask, single_mask], -1)
 
             # Padding reference image to square and resize to 224
-            masked_ref_image = pad_to_square(masked_ref_image, pad_value = 255, random = False)
+            masked_ref_image = pad_to_square(masked_ref_image, pad_value=255, random = False)
             masked_ref_image = cv2.resize(masked_ref_image.astype(np.uint8), (224, 224)).astype(np.uint8)
 
             ref_mask_3 = pad_to_square(ref_mask_3 * 255, pad_value = 0, random = False)

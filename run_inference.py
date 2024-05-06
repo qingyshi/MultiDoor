@@ -450,8 +450,8 @@ def run_for_single_case(reference_image_path, bg_image_path, caption, nouns):
             ref1_path = os.path.join(save_dir, "ref1.jpg")
             ref2_path = os.path.join(save_dir, "ref2.jpg")
             bg_path = os.path.join(save_dir, "bg.jpg")
-            shutil.copyfile(reference_bg_path[0], ref1_path)
-            shutil.copyfile(reference_bg_path[1], ref2_path)
+            # shutil.copyfile(reference_bg_path[0], ref1_path)
+            # shutil.copyfile(reference_bg_path[1], ref2_path)
             shutil.copyfile(bg_image_path, bg_path)
 
         # reference image + reference mask
@@ -489,16 +489,26 @@ def run_for_single_case(reference_image_path, bg_image_path, caption, nouns):
 
 
 if __name__ == '__main__':
-    cases = json.load(open("examples/case.json", "r"))
-    for case in cases["case"]:
-        reference_image_path = [case["ref1"], case["ref2"]]
-        bg_image_path = case["bg"]
-        caption = case["caption"]
-        nouns = case["names"]
-        run_for_single_case(
-            reference_image_path=reference_image_path,
-            bg_image_path=bg_image_path,
-            caption=caption,
-            nouns=nouns
-        )
-        print(f"{caption} finish!")
+    # cases = json.load(open("examples/case.json", "r"))
+    # for case in cases["case"]:
+    #     reference_image_path = [case["ref1"], case["ref2"]]
+    #     bg_image_path = case["bg"]
+    #     caption = case["caption"]
+    #     nouns = case["names"]
+    #     run_for_single_case(
+    #         reference_image_path=reference_image_path,
+    #         bg_image_path=bg_image_path,
+    #         caption=caption,
+    #         nouns=nouns
+    #     )
+    #     print(f"{caption} finish!")
+    reference_image_path = ["ref1.jpg", "ref2.jpg"]
+    bg_image_path = "examples/cocoval/person_bench/13/bg.jpg"
+    caption = "The teddy bear is sitting on the couch."
+    names = ["teddy bear", "couch"]
+    run_for_single_case(
+        reference_image_path=reference_image_path,
+        bg_image_path=bg_image_path,
+        caption=caption,
+        nouns=names
+    )
