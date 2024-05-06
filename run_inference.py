@@ -15,9 +15,10 @@ import albumentations as A
 from omegaconf import OmegaConf
 from PIL import Image
 import os
+import json
 import shutil
 from transformers import CLIPTokenizer
-import math
+
 
 save_memory = False
 disable_verbosity()
@@ -52,7 +53,10 @@ def process_nouns_format(nouns, caption):
         caption = caption[0]
     _nouns = []
     for noun in nouns:
-        start = caption.index(noun)
+        if len(_nouns) == 0:
+            start = caption.index(noun)
+        else:
+            start = caption.index(noun, _nouns[0]["end"])
         end = start + len(noun)
         noun = dict(
             word = noun,
@@ -394,23 +398,20 @@ def inference(ref_image, ref_mask, tar_image, tar_mask, ext, need_process, guida
         gen_image = pred
     return gen_image, hint
 
-
-if __name__ == '__main__': 
+    
+def run_for_single_case(reference_image_path, bg_image_path, caption, nouns):
     # ==== Example for inferring a single image ===
     # reference_image_path = ['example/dreambooth/dog/04.jpg', 'examples/dreambooth/cat2/03.jpg']
     # reference_mask_path = [ref_image_path.replace('jpg', 'png') for ref_image_path in reference_image_path]
     # bg_image_path = 'examples/background/03/00.png'
     # bg_mask_path = [bg_image_path.replace("00.png", "mask_0.png"), bg_image_path.replace("00.png", "mask_1.png")]
     # need_process = True
-    reference_image_path = ['examples/cocoval/cat_cat/2/ref2.jpg', 'examples/cocoval/surfboard_chair/0/ref1.jpg']
     reference_bg_path = [os.path.join(os.path.dirname(image_path), "bg.jpg") for image_path in reference_image_path]
-    bg_id = 11
-    bg_image_path = f'examples/cocoval/person_surfboard/0/bg.jpg'
     bg_mask_path = [bg_image_path.replace("bg.jpg", "0.png"), bg_image_path.replace("bg.jpg", "1.png")]
     need_process = False
     
-    caption = "The cat is surfing the surfboard."
-    nouns = ["cat", "surfboard"]
+    caption = caption
+    nouns = nouns
     class_name = "_".join(nouns)
     start = 1
        
@@ -484,19 +485,20 @@ if __name__ == '__main__':
             vis_image = cv2.hconcat([ref_image, back_image, hint, gen_image])
           
         start_index += 1
-        # cv2.imwrite(save_path, vis_image[:, :, ::-1])
         cv2.imwrite(save_path, gen_image[:, :, ::-1])
-        
-        # cross_attn_map = ddim_sampler.model.cross_attn_map_store['output_blocks.8.1.transformer_blocks.0.attn2']
-        # cross_attn_map = cross_attn_map.mean((0, 1))
-        # image_token_masks = ext["image_token_masks"]
-        # cross_attn_map = cross_attn_map[:, image_token_masks]
-        # res = int(math.sqrt(cross_attn_map.shape[0]))
-        # cross_attn_map = cross_attn_map.reshape(res, res, -1)
-        # ref1, ref2 = torch.chunk(cross_attn_map, 2, dim=-1)
-        # ref1 = ref1.squeeze(-1).cpu().numpy()
-        # ref2 = ref2.squeeze(-1).cpu().numpy()
-        # ref1 = (ref1 - ref1.min()) / (ref1.max() - ref1.min())
-        # ref2 = (ref2 - ref2.min()) / (ref2.max() - ref2.min())
-        # cv2.imwrite("camap1.jpg", ref1 * 255)
-        # cv2.imwrite("camap2.jpg", ref2 * 255)
+
+
+if __name__ == '__main__':
+    cases = json.load(open("examples/case.json", "r"))
+    for case in cases["case"]:
+        reference_image_path = [case["ref1"], case["ref2"]]
+        bg_image_path = case["bg"]
+        caption = case["caption"]
+        nouns = case["names"]
+        run_for_single_case(
+            reference_image_path=reference_image_path,
+            bg_image_path=bg_image_path,
+            caption=caption,
+            nouns=nouns
+        )
+        print(f"{caption} finish!")
