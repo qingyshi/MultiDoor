@@ -489,26 +489,26 @@ def run_for_single_case(reference_image_path, bg_image_path, caption, nouns):
 
 
 if __name__ == '__main__':
-    # cases = json.load(open("examples/case.json", "r"))
-    # for case in cases["case"]:
-    #     reference_image_path = [case["ref1"], case["ref2"]]
-    #     bg_image_path = case["bg"]
-    #     caption = case["caption"]
-    #     nouns = case["names"]
-    #     run_for_single_case(
-    #         reference_image_path=reference_image_path,
-    #         bg_image_path=bg_image_path,
-    #         caption=caption,
-    #         nouns=nouns
-    #     )
-    #     print(f"{caption} finish!")
-    reference_image_path = ["ref1.jpg", "ref2.jpg"]
-    bg_image_path = "examples/cocoval/person_bench/13/bg.jpg"
-    caption = "The teddy bear is sitting on the couch."
-    names = ["teddy bear", "couch"]
-    run_for_single_case(
-        reference_image_path=reference_image_path,
-        bg_image_path=bg_image_path,
-        caption=caption,
-        nouns=names
-    )
+    cases = json.load(open("examples/case.json", "r"))
+    for case in cases["case"]:
+        reference_image_path = [case["ref1"], case["ref2"]]
+        bg_image_path = case["bg"]
+        caption = case["caption"]
+        nouns = case["names"]
+        run_for_single_case(
+            reference_image_path=reference_image_path,
+            bg_image_path=bg_image_path,
+            caption=caption,
+            nouns=nouns
+        )
+        print(f"{caption} finish!")
+    # reference_image_path = ["ref1.jpg", "ref2.jpg"]
+    # bg_image_path = "examples/cocoval/person_bench/13/bg.jpg"
+    # caption = "The teddy bear is sitting on the couch."
+    # names = ["teddy bear", "couch"]
+    # run_for_single_case(
+    #     reference_image_path=reference_image_path,
+    #     bg_image_path=bg_image_path,
+    #     caption=caption,
+    #     nouns=names
+    # )
