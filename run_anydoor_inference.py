@@ -243,7 +243,7 @@ def run_and_save(reference_image_path=None, bg_image_path=None, save_path=None):
     back_image = cv2.imread(bg_image_path).astype(np.uint8)
     back_image = cv2.cvtColor(back_image, cv2.COLOR_BGR2RGB)
 
-    # background mask 
+    # background mask
     tar_mask = cv2.imread(bg_mask_path)[:,:,0] > 128
     tar_mask = tar_mask.astype(np.uint8)
     
