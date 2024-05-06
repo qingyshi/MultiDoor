@@ -487,16 +487,16 @@ if __name__ == '__main__':
         # cv2.imwrite(save_path, vis_image[:, :, ::-1])
         cv2.imwrite(save_path, gen_image[:, :, ::-1])
         
-        cross_attn_map = ddim_sampler.model.cross_attn_map_store['output_blocks.8.1.transformer_blocks.0.attn2']
-        cross_attn_map = cross_attn_map.mean((0, 1))
-        image_token_masks = ext["image_token_masks"]
-        cross_attn_map = cross_attn_map[:, image_token_masks]
-        res = int(math.sqrt(cross_attn_map.shape[0]))
-        cross_attn_map = cross_attn_map.reshape(res, res, -1)
-        ref1, ref2 = torch.chunk(cross_attn_map, 2, dim=-1)
-        ref1 = ref1.squeeze(-1).cpu().numpy()
-        ref2 = ref2.squeeze(-1).cpu().numpy()
-        ref1 = (ref1 - ref1.min()) / (ref1.max() - ref1.min())
-        ref2 = (ref2 - ref2.min()) / (ref2.max() - ref2.min())
-        cv2.imwrite("camap1.jpg", ref1 * 255)
-        cv2.imwrite("camap2.jpg", ref2 * 255)
+        # cross_attn_map = ddim_sampler.model.cross_attn_map_store['output_blocks.8.1.transformer_blocks.0.attn2']
+        # cross_attn_map = cross_attn_map.mean((0, 1))
+        # image_token_masks = ext["image_token_masks"]
+        # cross_attn_map = cross_attn_map[:, image_token_masks]
+        # res = int(math.sqrt(cross_attn_map.shape[0]))
+        # cross_attn_map = cross_attn_map.reshape(res, res, -1)
+        # ref1, ref2 = torch.chunk(cross_attn_map, 2, dim=-1)
+        # ref1 = ref1.squeeze(-1).cpu().numpy()
+        # ref2 = ref2.squeeze(-1).cpu().numpy()
+        # ref1 = (ref1 - ref1.min()) / (ref1.max() - ref1.min())
+        # ref2 = (ref2 - ref2.min()) / (ref2.max() - ref2.min())
+        # cv2.imwrite("camap1.jpg", ref1 * 255)
+        # cv2.imwrite("camap2.jpg", ref2 * 255)

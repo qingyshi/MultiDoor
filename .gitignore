@@ -147,4 +147,4 @@ checkpoints/
 hf_down.py
 cache_dir/
 .vscode/
-examples/
+examples
