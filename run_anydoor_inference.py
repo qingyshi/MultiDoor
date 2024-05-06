@@ -225,7 +225,7 @@ def run_and_save(reference_image_path=None, bg_image_path=None, save_path=None):
     reference_mask_path = 'examples/cocoval/cat_dog/10/0.png'
     bg_image_path = 'examples/cocoval/person_surfboard/0/bg.jpg'
     bg_mask_path = 'examples/cocoval/person_surfboard/0/0.png'
-    save_path = 'test2.jpg'
+    save_path = 'test.jpg'
 
     # reference image + reference mask
     # You could use the demo of SAM to extract RGB-A image with masks
