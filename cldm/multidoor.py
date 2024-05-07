@@ -238,6 +238,11 @@ class MultiDoor(LatentDiffusion):
             num_objects, # (b, 1)
         )
         
+        if torch.rand(1) < 0.2:
+            void_context = torch.tensor([self.pad_token_id] * b).unsqueeze(1).repeat(1, 77).cuda()
+            void_context = self.cond_stage_model(void_context).last_hidden_state
+            context = void_context
+        
         cond = dict(
             c_crossattn = context,
             c_concat = c_concat,
@@ -345,7 +350,7 @@ class MultiDoor(LatentDiffusion):
     
     @torch.no_grad()
     def get_unconditional_conditioning(self, num_samples):
-        uncond_image = torch.zeros(num_samples, 2, 224, 224, 3).cuda()
+        uncond_image = torch.ones(num_samples, 2, 224, 224, 3).cuda()
         uncond_ip, _ = self.image_encoder(uncond_image)
         uncond = torch.tensor([self.pad_token_id] * num_samples).unsqueeze(1).repeat(1, 77).cuda()
         uncond_context = self.cond_stage_model(uncond).last_hidden_state

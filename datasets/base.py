@@ -252,9 +252,6 @@ class BaseDataset(Dataset):
             _, H, W = target_masks.shape
             mask_padding = np.zeros((self.max_num_objects - n, H, W))
             target_masks = np.concatenate([target_masks, mask_padding], axis=0)
-        
-        if np.random.rand() < 0.1:
-            masked_ref_image_aug = np.zeros_like(masked_ref_image_aug)
              
         item = dict(
             ref=masked_ref_image_aug.copy(), 

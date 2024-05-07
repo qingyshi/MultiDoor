@@ -270,7 +270,7 @@ class IPAdapter(nn.Module):
         
         self.to_k_ip = nn.Linear(context_dim, inner_dim, bias=False)
         self.to_v_ip = nn.Linear(context_dim, inner_dim, bias=False)
-        self.ip_scale = nn.Parameter(torch.tensor([0.0]))
+        self.ip_scale = 1.0
 
     def forward(self, x, context=None, subject=None, mask=None):
         h = self.heads
