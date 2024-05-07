@@ -7,6 +7,7 @@ from einops import rearrange, repeat
 from typing import Optional, Any
 
 from ldm.modules.diffusionmodules.util import checkpoint
+from ldm.modules.ip_adapter import AttnProcessor, IPAttnProcessor
 
 
 try:
@@ -269,7 +270,7 @@ class IPAdapter(nn.Module):
         
         self.to_k_ip = nn.Linear(context_dim, inner_dim, bias=False)
         self.to_v_ip = nn.Linear(context_dim, inner_dim, bias=False)
-        self.ip_scale = 1
+        self.ip_scale = nn.Parameter(torch.tensor([0.0]))
 
     def forward(self, x, context=None, subject=None, mask=None):
         h = self.heads
@@ -334,7 +335,7 @@ class BasicTransformerBlock(nn.Module):
         self.attn1 = attn_cls(query_dim=dim, heads=n_heads, dim_head=d_head, dropout=dropout,
                               context_dim=context_dim if self.disable_self_attn else None)  # is a self-attention if not self.disable_self_attn
         self.ff = FeedForward(dim, dropout=dropout, glu=gated_ff)
-        self.attn2 = attn_cls(query_dim=dim, context_dim=context_dim,
+        self.attn2 = IPAdapter(query_dim=dim, context_dim=context_dim,
                               heads=n_heads, dim_head=d_head, dropout=dropout)  # is self-attn if context is none
 
         self.norm1 = nn.LayerNorm(dim)
@@ -342,12 +343,12 @@ class BasicTransformerBlock(nn.Module):
         self.norm3 = nn.LayerNorm(dim)
         self.checkpoint = checkpoint
 
-    def forward(self, x, context=None):
-        return checkpoint(self._forward, (x, context), self.parameters(), self.checkpoint)
+    def forward(self, x, context=None, ip=None):
+        return checkpoint(self._forward, (x, context, ip), self.parameters(), self.checkpoint)
         
-    def _forward(self, x, context=None):
+    def _forward(self, x, context=None, ip=None):
         x = self.attn1(self.norm1(x), context=context if self.disable_self_attn else None) + x
-        x = self.attn2(self.norm2(x), context=context) + x
+        x = self.attn2(self.norm2(x), context=context, subject=ip) + x
         x = self.ff(self.norm3(x)) + x
         return x
 
@@ -395,7 +396,7 @@ class SpatialTransformer(nn.Module):
             self.proj_out = zero_module(nn.Linear(in_channels, inner_dim))
         self.use_linear = use_linear
 
-    def forward(self, x, context=None):
+    def forward(self, x, context=None, ip=None):
         # note: if no context is given, cross-attention defaults to self-attention  
         b, c, h, w = x.shape
         x_in = x
@@ -406,7 +407,7 @@ class SpatialTransformer(nn.Module):
         if self.use_linear:
             x = self.proj_in(x)
         for i, block in enumerate(self.transformer_blocks):
-            x = block(x, context=context)
+            x = block(x, context=context, ip=ip)
         if self.use_linear:
             x = self.proj_out(x)
         x = rearrange(x, 'b (h w) c -> b c h w', h=h, w=w).contiguous()

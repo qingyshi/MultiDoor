@@ -15,7 +15,7 @@ from share import *
 from cldm.model import create_model
 
 
-# python tool_add_fuser_sd21.py /data00/sqy/checkpoints/stable-diffusion-2-1-base/v2-1_512-ema-pruned.ckpt checkpoints/sd_ini.ckpt
+# python tool_add_adapter_sd21.py /data00/sqy/checkpoints/stable-diffusion-2-1-base/v2-1_512-ema-pruned.ckpt checkpoints/sd_ini.ckpt
 
 def get_node_name(name, parent_name):
     if len(name) <= len(parent_name):
@@ -35,15 +35,19 @@ scratch_dict = model.state_dict()
 
 target_dict = {}
 for k in scratch_dict.keys():
-    is_control, name = get_node_name(k, 'control_')     # name: "model.xxxx"
-    if 'control_model.input_blocks.0.0' in k:
-        print('skipped key: ', k)
+    if "attn2.to_k_ip" in k:
+        copy_k = k.replace("to_k_ip", "to_k")
+    elif "attn2.to_v_ip" in k:
+        copy_k = k.replace("to_v_ip", "to_v")
+    elif "input_blocks.0" in k:
+        shape = scratch_dict[k].shape
+        print(f"skip key: {k} ---> {shape}")
         continue
-
-    if is_control:
-        copy_k = 'model.diffusion_' + name
+    elif "image_encoder" in k:
+        continue
     else:
         copy_k = k
+        
     if copy_k in pretrained_weights:
         target_dict[k] = pretrained_weights[copy_k].clone()
     else:

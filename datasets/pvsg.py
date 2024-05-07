@@ -17,7 +17,7 @@ class PVSGDataset(BaseDataset):
         self.dynamic = 2
 
     def __len__(self):
-        return 20000
+        return 15000
     
     def get_sample(self, index):
         data = self.data[index]
@@ -53,8 +53,10 @@ class PVSGDataset(BaseDataset):
 
         if '-' in video_id:
             dir_name = 'ego4d'
+            raise ValueError
         elif 'P' in video_id:
             dir_name = 'epic_kitchen'
+            raise ValueError
         else:
             dir_name = 'vidor' 
         video_dir = os.path.join(self.data_root, dir_name, 'frames', video_id)

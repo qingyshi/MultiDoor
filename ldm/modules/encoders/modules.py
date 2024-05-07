@@ -275,10 +275,10 @@ from einops import rearrange
 from omegaconf import OmegaConf
 config_path = './configs/multidoor.yaml'
 config = OmegaConf.load(config_path)
-DINOv2_weight_path = config.model.params.image_cond_config.weight
+DINOv2_weight_path = config.model.params.image_stage_config.weight
 
 
-class FrozenMultiDoorEncoder(AbstractEncoder):
+class MultiDoorImageEncoder(AbstractEncoder):
     """
     Uses the DINOv2 encoder for image
     """
@@ -318,7 +318,8 @@ class FrozenMultiDoorEncoder(AbstractEncoder):
         clstoken  = features["x_norm_clstoken"] # (b * n, 1536)
         patchtokens = features["x_norm_patchtokens"] # (b * n, 256, 1536)
         image_features = clstoken.reshape(b, n, 1, 1536)
-        ip_tokens = patchtokens.reshape(b, n, 256, 1536).flatten(1, 2)
+        ip_tokens = torch.cat([clstoken.reshape(b, n, 1, 1536), patchtokens.reshape(b, n, 256, 1536)], dim=-2)
+        ip_tokens = ip_tokens.flatten(1, 2)
         return self.projecter(ip_tokens), self.projecter(image_features)
 
     def encode(self, image):

@@ -22,12 +22,12 @@ if save_memory:
 
 # Configs
 resume_path = 'checkpoints/sd_ini.ckpt'
-batch_size = 8
+batch_size = 4
 logger_freq = 2000
 learning_rate = 1e-5
 sd_locked = False
 only_mid_control = False
-gpus = 4
+gpus = 1
 accumulate_grad_batches = 1
 max_epochs = 24
 
