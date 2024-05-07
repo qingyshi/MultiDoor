@@ -245,8 +245,8 @@ class BaseDataset(Dataset):
         
         num_objects = np.array([masked_ref_image_aug.shape[0]])
         if len(masked_ref_image_aug) < self.max_num_objects:
-            n, c, h, w = masked_ref_image_aug.shape
-            ref_padding = np.zeros((self.max_num_objects - n, c, h, w))
+            n, h, w, c = masked_ref_image_aug.shape
+            ref_padding = np.zeros((self.max_num_objects - n, h, w, c))
             masked_ref_image_aug = np.concatenate([masked_ref_image_aug, ref_padding], axis=0)
             
             _, H, W = target_masks.shape
@@ -261,7 +261,7 @@ class BaseDataset(Dataset):
             tar_box_yyxx_crop=np.array(tar_box_yyxx_crop),
             target_masks=target_masks,
             num_objects=num_objects,
-        ) 
+        )
         return item
 
     def load_caption(self, idx):

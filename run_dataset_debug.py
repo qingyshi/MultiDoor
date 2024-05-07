@@ -81,7 +81,7 @@ def make_test_case(item):
     
     tar = tar.numpy()[:, :, ::-1]
     tar_mask1, tar_mask2 = tar_masks[0].numpy(), tar_masks[1].numpy()
-    bg = f"examples/cocovalv2/{caption}"
+    bg = f"examples/cocoval/{caption}"
     count = 0
     while True:
         dir_path = os.path.join(bg, str(count))

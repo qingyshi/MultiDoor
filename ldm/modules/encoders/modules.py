@@ -318,7 +318,8 @@ class FrozenMultiDoorEncoder(AbstractEncoder):
         clstoken = features["x_norm_clstoken"] # (b * n, 1536)
         clstoken = clstoken.reshape(b, n, 1, -1)
         patchtokens = features["x_norm_patchtokens"] # (b * n, 256, 1536)
-        patchtokens = torch.cat([patchtokens.reshape(b, n, 256, -1), clstoken], dim=-2)
+        patchtokens = patchtokens.reshape(b, n, 256, -1)
+        patchtokens = torch.cat([clstoken, patchtokens], dim=-2)
         patchtokens = self.project(patchtokens).flatten(1, 2)
         return patchtokens, clstoken
 

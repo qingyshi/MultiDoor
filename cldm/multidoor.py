@@ -204,7 +204,7 @@ class MultiDoor(LatentDiffusion):
         )
         
         cond = dict(
-            c_ip = patch_token,    # (b, n * 256, 1024)
+            c_ip = patch_token,    # (b, n * 257, 1024)
             c_crossattn = context,
             c_concat = control,
             hf_map = control[:, :3],
