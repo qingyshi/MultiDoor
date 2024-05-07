@@ -264,8 +264,7 @@ class MultiDoor(LatentDiffusion):
         lr = self.learning_rate
         params = list(self.fuser.parameters())
         params += list(self.image_encoder.projecter.parameters())
-        params += list(self.model.diffusion_model.output_blocks.parameters())
-        params += list(self.model.diffusion_model.out.parameters())
+        params += list(self.model.diffusion_model.parameters())
         opt = torch.optim.AdamW(params, lr=lr)
         return opt
     
