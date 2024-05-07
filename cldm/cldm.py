@@ -11,7 +11,7 @@ from ldm.modules.diffusionmodules.util import (
 )
 from einops import rearrange, repeat
 from torchvision.utils import make_grid
-from ldm.modules.attention import SpatialTransformer, BasicTransformerBlock
+from ldm.modules.attention import SpatialTransformer
 from ldm.modules.diffusionmodules.openaimodel import UNetModel, TimestepEmbedSequential, ResBlock, Downsample, AttentionBlock
 from ldm.models.diffusion.ddpm import LatentDiffusion
 from ldm.util import log_txt_as_img, exists, instantiate_from_config
@@ -280,7 +280,7 @@ class ControlNet(nn.Module):
     def make_zero_conv(self, channels):
         return TimestepEmbedSequential(zero_module(conv_nd(self.dims, channels, channels, 1, padding=0)))
 
-    def forward(self, x, hint, timesteps, context, **kwargs):
+    def forward(self, x, hint, timesteps, context, ip, **kwargs):
         t_emb = timestep_embedding(timesteps, self.model_channels, repeat_only=False)
         emb = self.time_embed(t_emb) # 1, 1280
         
@@ -295,11 +295,11 @@ class ControlNet(nn.Module):
                 h = guided_hint
                 guided_hint = None
             else:
-                h_new = module(h, emb, context) 
+                h_new = module(h, emb, context, ip) 
                 h =  h_new 
             outs.append(zero_conv(h, emb, context))
 
-        h_new = self.middle_block(h, emb, context)  
+        h_new = self.middle_block(h, emb, context, ip)  
         outs.append(self.middle_block_out(h_new, emb, context))        
         return outs
 
