@@ -161,7 +161,7 @@ class CrossAttention(nn.Module):
         )
         self.cross_attn_map_store = None
 
-    def forward(self, x, context=None, mask=None):
+    def forward(self, x, context=None, attn_bias=None, mask=None):
         h = self.heads
 
         q = self.to_q(x)
@@ -175,9 +175,15 @@ class CrossAttention(nn.Module):
         if _ATTN_PRECISION =="fp32":
             with torch.autocast(enabled=False, device_type = 'cuda'):
                 q, k = q.float(), k.float()
-                sim = einsum('b i d, b j d -> b i j', q, k) * self.scale
+                sim = einsum('b i d, b j d -> b i j', q, k)
+                if attn_bias is not None:
+                    sim = sim + attn_bias
+                sim = sim * self.scale
         else:
-            sim = einsum('b i d, b j d -> b i j', q, k) * self.scale
+            sim = einsum('b i d, b j d -> b i j', q, k)
+            if attn_bias is not None:
+                sim = sim + attn_bias
+            sim = sim * self.scale
         
         del q, k
     
@@ -327,7 +333,6 @@ class BasicTransformerBlock(nn.Module):
     def __init__(self, dim, n_heads, d_head, dropout=0., context_dim=None, gated_ff=True, checkpoint=True,
                  disable_self_attn=False):
         super().__init__()
-        attn_mode = "softmax-xformers" if XFORMERS_IS_AVAILBLE else "softmax"
         attn_mode = "softmax"
         assert attn_mode in self.ATTENTION_MODES
         attn_cls = self.ATTENTION_MODES[attn_mode]

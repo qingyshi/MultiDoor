@@ -270,6 +270,8 @@ class MultiDoor(LatentDiffusion):
         diffusion_model = self.model.diffusion_model
         context = cond['c_crossattn']
         inpaint = cond['c_concat']
+        attn_bias = cond.get('attn_bias', None) # dict (res ** 2, 77)
+        
         input = torch.cat([x_noisy, inpaint], dim=1) # (b, 9, h, w)
         eps = diffusion_model(x=input, timesteps=t, context=context)
         return eps
