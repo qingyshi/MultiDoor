@@ -238,10 +238,12 @@ class MultiDoor(LatentDiffusion):
             num_objects, # (b, 1)
         )
         
-        if torch.rand(1) < 0.2:
-            void_context = torch.tensor([self.pad_token_id] * b).unsqueeze(1).repeat(1, 77).cuda()
-            void_context = self.cond_stage_model(void_context).last_hidden_state
-            context = void_context
+        if torch.rand(1) < 0.1:
+            # void_context = torch.tensor([self.pad_token_id] * b).unsqueeze(1).repeat(1, 77).cuda()
+            # void_context = self.cond_stage_model(void_context).last_hidden_state
+            # context = void_context
+            void_images = torch.ones_like(image)
+            ip_tokens, image_token = self.image_encoder(void_images)
         
         cond = dict(
             c_crossattn = context,
