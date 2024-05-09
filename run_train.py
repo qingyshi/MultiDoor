@@ -28,7 +28,7 @@ learning_rate = 1e-5
 sd_locked = False
 only_mid_control = False
 gpus = 4
-accumulate_grad_batches = 1
+accumulate_grad_batches = 2
 max_epochs = 24
 
 # First use cpu to load models. Pytorch Lightning will automatically move it to GPUs.

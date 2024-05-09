@@ -349,7 +349,7 @@ class GatedSelfAttentionDense(nn.Module):
         objs = self.linear(objs)
 
         x = x + self.scale * torch.tanh(self.alpha_attn) * self.attn(self.norm1(torch.cat([x, objs], dim=1)))[:, 0: N_visual, :]
-        x = x + self.scale * torch.tanh(self.alpha_dense) * self.ff(self.norm2(x))  
+        x = x + self.scale * torch.tanh(self.alpha_dense) * self.ff(self.norm2(x))
         
         return x
 
