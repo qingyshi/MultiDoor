@@ -320,6 +320,40 @@ class IPAdapter(nn.Module):
         return self.to_out(out)
 
 
+class GatedSelfAttentionDense(nn.Module):
+    def __init__(self, query_dim, context_dim,  n_heads, d_head):
+        super().__init__()
+        
+        # we need a linear projection since we need cat visual feature and obj feature
+        self.linear = nn.Linear(context_dim, query_dim)
+
+        self.attn = MemoryEfficientCrossAttention(query_dim=query_dim, 
+                                                  heads=n_heads, 
+                                                  dim_head=d_head)
+        self.ff = FeedForward(query_dim, glu=True)
+
+        self.norm1 = nn.LayerNorm(query_dim)
+        self.norm2 = nn.LayerNorm(query_dim)
+
+        self.register_parameter('alpha_attn', nn.Parameter(torch.tensor(0.)) )
+        self.register_parameter('alpha_dense', nn.Parameter(torch.tensor(0.)) )
+
+        # this can be useful: we can externally change magnitude of tanh(alpha)
+        # for example, when it is set to 0, then the entire model is same as original one 
+        self.scale = 1  
+
+
+    def forward(self, x, objs):
+
+        N_visual = x.shape[1]
+        objs = self.linear(objs)
+
+        x = x + self.scale * torch.tanh(self.alpha_attn) * self.attn(self.norm1(torch.cat([x, objs], dim=1)))[:, 0: N_visual, :]
+        x = x + self.scale * torch.tanh(self.alpha_dense) * self.ff(self.norm2(x))  
+        
+        return x
+
+
 class BasicTransformerBlock(nn.Module):
     ATTENTION_MODES = {
         "softmax": CrossAttention,  # vanilla attention
@@ -335,20 +369,21 @@ class BasicTransformerBlock(nn.Module):
         self.attn1 = attn_cls(query_dim=dim, heads=n_heads, dim_head=d_head, dropout=dropout,
                               context_dim=context_dim if self.disable_self_attn else None)  # is a self-attention if not self.disable_self_attn
         self.ff = FeedForward(dim, dropout=dropout, glu=gated_ff)
-        self.attn2 = IPAdapter(query_dim=dim, context_dim=context_dim,
+        self.fuser = GatedSelfAttentionDense(dim, context_dim=context_dim, 
+                                             n_heads=n_heads, d_head=d_head)
+        
+        self.attn2 = attn_cls(query_dim=dim, context_dim=context_dim,
                               heads=n_heads, dim_head=d_head, dropout=dropout)  # is self-attn if context is none
 
         self.norm1 = nn.LayerNorm(dim)
         self.norm2 = nn.LayerNorm(dim)
         self.norm3 = nn.LayerNorm(dim)
         self.checkpoint = checkpoint
-
-    def forward(self, x, context=None, ip=None):
-        return checkpoint(self._forward, (x, context, ip), self.parameters(), self.checkpoint)
         
-    def _forward(self, x, context=None, ip=None):
+    def forward(self, x, context=None, ip=None):
         x = self.attn1(self.norm1(x), context=context if self.disable_self_attn else None) + x
-        x = self.attn2(self.norm2(x), context=context, subject=ip) + x
+        x = self.fuser(x, ip)
+        x = self.attn2(self.norm2(x), context=context) + x
         x = self.ff(self.norm3(x)) + x
         return x
 

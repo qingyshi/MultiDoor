@@ -22,7 +22,7 @@ class HICODataset(BaseDataset):
         self.annotations = ann['annotation']
         self.ids2verb: list = ann['verbs']
         self.ids2obj: list = ann['objects']
-        self.dynamic = 2
+        self.dynamic = 0
     
     def __len__(self):
         return 40000
@@ -91,7 +91,7 @@ class HICOTestDataset(BaseDataset):
         self.annotations = ann['annotation']
         self.ids2verb: list = ann['verbs']
         self.ids2obj: list = ann['objects']
-        self.dynamic = 2
+        self.dynamic = 0
     
     def __len__(self):
         return 10000
