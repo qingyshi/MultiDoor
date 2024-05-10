@@ -21,7 +21,7 @@ if save_memory:
     enable_sliced_attention()
 
 # Configs
-resume_path = 'checkpoints/sd_ini.ckpt'
+resume_path = 'lightning_logs/version_19/checkpoints/epoch=8-step=43595.ckpt'
 batch_size = 4
 logger_freq = 2000
 learning_rate = 1e-5
@@ -60,7 +60,7 @@ video_data = [dataset4, dataset5, dataset9, dataset11, dataset12]
 # The ratio of each dataset is adjusted by setting the __len__ 
 dataset = ConcatDataset(image_data + video_data)
 dataloader = DataLoader(dataset, num_workers=8, batch_size=batch_size, shuffle=True)
-logger = ImageLogger(batch_frequency=logger_freq, split="gates")
+logger = ImageLogger(batch_frequency=logger_freq, split="gates_")
 trainer = pl.Trainer(
     gpus=gpus,
     strategy="ddp",
