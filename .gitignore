@@ -149,4 +149,5 @@ cache_dir/
 .vscode/
 data/
 examples
+test_case
 test.py

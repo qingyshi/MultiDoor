@@ -1,4 +1,5 @@
 import cv2
+import json
 import einops
 import numpy as np
 import torch
@@ -219,13 +220,13 @@ def inference_single_image(ref_image, ref_mask, tar_image, tar_mask, guidance_sc
     return gen_image
 
 
-def run_and_save(reference_image_path=None, bg_image_path=None, save_path=None):
+def run_and_save(reference_image_path=None, bg_image_path=None, bg_mask_path=None, save_path=None):
     # ==== Example for inferring a single image ===
-    reference_image_path = 'examples/cocoval/cat_cat/10/ref2.jpg'
-    reference_mask_path = 'examples/cocoval/cat_dog/10/0.png'
-    bg_image_path = 'examples/cocoval/person_surfboard/0/bg.jpg'
-    bg_mask_path = 'examples/cocoval/person_surfboard/0/0.png'
-    save_path = 'test.jpg'
+    reference_image_path = reference_image_path
+    reference_mask_path = None
+    bg_image_path = bg_image_path
+    bg_mask_path = bg_mask_path
+    save_path = save_path
 
     # reference image + reference mask
     # You could use the demo of SAM to extract RGB-A image with masks
@@ -250,7 +251,7 @@ def run_and_save(reference_image_path=None, bg_image_path=None, save_path=None):
     gen_image = inference_single_image(ref_image, ref_mask, back_image.copy(), tar_mask)
     h,w = back_image.shape[0], back_image.shape[0]
     ref_image = cv2.resize(ref_image, (w,h))
-    vis_image = cv2.hconcat([ref_image, back_image, gen_image])
+    # vis_image = cv2.hconcat([ref_image, back_image, gen_image])
     
     cv2.imwrite(save_path, gen_image[:,:,::-1])
     #'''
@@ -291,5 +292,15 @@ def run_and_save(reference_image_path=None, bg_image_path=None, save_path=None):
     #     cv2.imwrite(gen_path, vis_image[:,:,::-1])
     #'''
 
-if __name__ == '__main__': 
-    run_and_save()
+if __name__ == '__main__':
+    test_dataset_json = "/data00/multidoor_dataset/test_dataset.json"
+    with open(test_dataset_json, "r") as f:
+        test_cases = json.load(f)
+    
+    test_cases = test_cases["cases"]
+    for case in test_cases:
+        reference_image_path = case["reference_images_path"][0]
+        bg_image_path = case["bg_image_path"]
+        bg_mask_path = case["bg_masks_path"][0]
+        save_path = case["save_path"]
+        run_and_save(reference_image_path, bg_image_path, bg_mask_path, save_path)
