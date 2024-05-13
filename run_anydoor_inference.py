@@ -299,8 +299,8 @@ if __name__ == '__main__':
     
     test_cases = test_cases["cases"]
     for case in test_cases:
-        reference_image_path = case["reference_images_path"][0]
-        bg_image_path = case["bg_image_path"]
-        bg_mask_path = case["bg_masks_path"][0]
+        reference_image_path = case["reference_images_path"][1]
+        bg_image_path = case["save_path"]
+        bg_mask_path = case["bg_masks_path"][1]
         save_path = case["save_path"]
         run_and_save(reference_image_path, bg_image_path, bg_mask_path, save_path)
