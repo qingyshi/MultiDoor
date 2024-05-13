@@ -399,7 +399,7 @@ def inference(ref_image, ref_mask, tar_image, tar_mask, ext, need_process, guida
     return gen_image, hint
 
     
-def run_for_single_case(reference_image_path, bg_image_path, caption, nouns):
+def run_for_single_case(reference_image_path, bg_image_path, caption, nouns, bg_masks_path=None, save_path=None):
     # ==== Example for inferring a single image ===
     # reference_image_path = ['example/dreambooth/dog/04.jpg', 'examples/dreambooth/cat2/03.jpg']
     # reference_mask_path = [ref_image_path.replace('jpg', 'png') for ref_image_path in reference_image_path]
@@ -407,7 +407,7 @@ def run_for_single_case(reference_image_path, bg_image_path, caption, nouns):
     # bg_mask_path = [bg_image_path.replace("00.png", "mask_0.png"), bg_image_path.replace("00.png", "mask_1.png")]
     # need_process = True
     reference_bg_path = [os.path.join(os.path.dirname(image_path), "bg.jpg") for image_path in reference_image_path]
-    bg_mask_path = [bg_image_path.replace("bg.jpg", "0.png"), bg_image_path.replace("bg.jpg", "1.png")]
+    bg_mask_path = [bg_image_path.replace("bg.jpg", "0.png"), bg_image_path.replace("bg.jpg", "1.png")] if bg_masks_path is None else bg_masks_path
     need_process = False
     
     caption = caption
@@ -434,74 +434,78 @@ def run_for_single_case(reference_image_path, bg_image_path, caption, nouns):
         image_token_id=image_token_id
     )
     
-    start_index = 0
-    total_num = 5
-    save_root = "./examples/GEN"
-    while True:
-        save_dir = os.path.join(save_root, class_name, f"{start}")
-        if os.path.exists(save_dir):
-            start += 1
-        else:
-            break
-    while start_index < total_num:
-        save_path = os.path.join(save_dir, f"gen{start_index}.jpg")
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
-            ref1_path = os.path.join(save_dir, "ref1.jpg")
-            ref2_path = os.path.join(save_dir, "ref2.jpg")
-            bg_path = os.path.join(save_dir, "bg.jpg")
-            # shutil.copyfile(reference_bg_path[0], ref1_path)
-            # shutil.copyfile(reference_bg_path[1], ref2_path)
-            shutil.copyfile(bg_image_path, bg_path)
+    # reference image + reference mask
+    if isinstance(reference_image_path, list):
+        image = [cv2.cvtColor(cv2.imread(ref_image_path), cv2.COLOR_BGR2RGB)
+            for ref_image_path in reference_image_path]
+    else:
+        image = cv2.cvtColor(cv2.imread(reference_image_path), cv2.COLOR_BGR2RGB)
+    ref_image = image
+    ref_mask = [(ref.sum(-1) != 255 * 3).astype(np.uint8) * 255 for ref in ref_image]
 
-        # reference image + reference mask
-        if isinstance(reference_image_path, list):
-            image = [cv2.cvtColor(cv2.imread(ref_image_path), cv2.COLOR_BGR2RGB)
-                for ref_image_path in reference_image_path]
-        else:
-            image = cv2.cvtColor(cv2.imread(reference_image_path), cv2.COLOR_BGR2RGB)
-        ref_image = image
-        ref_mask = [(ref.sum(-1) != 255 * 3).astype(np.uint8) * 255 for ref in ref_image]
-
-        # background image
-        back_image = cv2.imread(bg_image_path).astype(np.uint8)
-        back_image = cv2.cvtColor(back_image, cv2.COLOR_BGR2RGB)
-
-        # background mask 
-        tar_mask = [np.array(Image.open(file).convert('L')) == 255 for file in bg_mask_path]
-        
+    # background image + background mask 
+    back_image = cv2.imread(bg_image_path).astype(np.uint8)
+    back_image = cv2.cvtColor(back_image, cv2.COLOR_BGR2RGB)
+    tar_mask = [np.array(Image.open(file).convert('L')) == 255 for file in bg_mask_path]
+    
+    if save_path is None:
+        start_index = 0
+        total_num = 5
+        save_root = "./examples/GEN"
+        while True:
+            save_dir = os.path.join(save_root, class_name, f"{start}")
+            if os.path.exists(save_dir):
+                start += 1
+            else:
+                break
+        while start_index < total_num:
+            save_path = os.path.join(save_dir, f"gen{start_index}.jpg")
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+                ref1_path = os.path.join(save_dir, "ref1.jpg")
+                ref2_path = os.path.join(save_dir, "ref2.jpg")
+                bg_path = os.path.join(save_dir, "bg.jpg")
+                shutil.copyfile(reference_bg_path[0], ref1_path)
+                shutil.copyfile(reference_bg_path[1], ref2_path)
+                shutil.copyfile(bg_image_path, bg_path)
+            
+            gen_image, hint = inference(ref_image, ref_mask, back_image, tar_mask, ext, need_process=need_process, guidance_scale=9.0)
+            
+            h, w = back_image.shape[0], back_image.shape[1]
+            hint = cv2.resize(hint, (w, h))
+            hint = hint[:, :, :-1] * 127.5 + 127.5
+            hint = hint.astype(np.uint8)
+            if isinstance(ref_image, list):
+                ref_image = [cv2.resize(ref, (w, h)).astype(np.uint8) for ref in ref_image]
+                vis_image = cv2.hconcat([ref_image[0], ref_image[1], back_image, hint, gen_image.astype(np.uint8)])
+            else:
+                ref_image = cv2.resize(ref_image, (w, h))
+                tar_mask = [cv2.resize(tar_m, (w, h)) for tar_m in tar_mask]
+                vis_image = cv2.hconcat([ref_image, back_image, hint, gen_image])
+            
+            start_index += 1
+            cv2.imwrite(save_path, gen_image[:, :, ::-1])
+    else:
         gen_image, hint = inference(ref_image, ref_mask, back_image, tar_mask, ext, need_process=need_process, guidance_scale=9.0)
-        
-        h, w = back_image.shape[0], back_image.shape[1]
-        hint = cv2.resize(hint, (w, h))
-        hint = hint[:, :, :-1] * 127.5 + 127.5
-        hint = hint.astype(np.uint8)
-        if isinstance(ref_image, list):
-            ref_image = [cv2.resize(ref, (w, h)).astype(np.uint8) for ref in ref_image]
-            vis_image = cv2.hconcat([ref_image[0], ref_image[1], back_image, hint, gen_image.astype(np.uint8)])
-        else:
-            ref_image = cv2.resize(ref_image, (w, h))
-            tar_mask = [cv2.resize(tar_m, (w, h)) for tar_m in tar_mask]
-            vis_image = cv2.hconcat([ref_image, back_image, hint, gen_image])
-          
-        start_index += 1
         cv2.imwrite(save_path, gen_image[:, :, ::-1])
+        return None
+        
 
 
 if __name__ == '__main__':
-    cases = json.load(open("examples/case.json", "r"))
-    for case in cases["case"]:
-        reference_image_path = [case["ref1"], case["ref2"]]
-        bg_image_path = case["bg"]
-        caption = case["caption"]
-        nouns = case["names"]
-        run_for_single_case(
-            reference_image_path=reference_image_path,
-            bg_image_path=bg_image_path,
-            caption=caption,
-            nouns=nouns
-        )
-        print(f"{caption} finish!")
+    # cases = json.load(open("examples/case.json", "r"))
+    # for case in cases["case"]:
+    #     reference_image_path = [case["ref1"], case["ref2"]]
+    #     bg_image_path = case["bg"]
+    #     caption = case["caption"]
+    #     nouns = case["names"]
+    #     run_for_single_case(
+    #         reference_image_path=reference_image_path,
+    #         bg_image_path=bg_image_path,
+    #         caption=caption,
+    #         nouns=nouns
+    #     )
+    #     print(f"{caption} finish!")
     # reference_image_path = ["ref1.jpg", "ref2.jpg"]
     # bg_image_path = "examples/cocoval/person_bench/13/bg.jpg"
     # caption = "The teddy bear is sitting on the couch."
@@ -512,3 +516,23 @@ if __name__ == '__main__':
     #     caption=caption,
     #     nouns=names
     # )
+    
+    with open("/data00/multidoor_dataset/test_dataset.json", "r") as file:
+        cases = json.load(file)["cases"]
+        
+    for case in cases:
+        reference_image_path = case["reference_images_path"]
+        bg_image_path = case["bg_image_path"]
+        bg_masks_path = case["bg_masks_path"]
+        caption = case["caption"]
+        nouns = case["nouns"]
+        save_path = case["save_path"]
+        
+        run_for_single_case(
+            reference_image_path=reference_image_path,
+            bg_image_path=bg_image_path,
+            caption=caption,
+            nouns=nouns,
+            bg_masks_path=bg_masks_path,
+            save_path=save_path
+        )
