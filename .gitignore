@@ -148,3 +148,4 @@ hf_down.py
 cache_dir/
 .vscode/
 examples
+test_case
